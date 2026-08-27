@@ -2,6 +2,7 @@ class SoundService {
   static audioCtx = null;
   static cachedVoice = null;
   static voicesInitialized = false;
+  static currentAudio = null;
 
   static init() {
     if (typeof window === 'undefined') return;
@@ -17,12 +18,11 @@ class SoundService {
       try {
         const voices = window.speechSynthesis.getVoices();
         if (voices.length > 0) {
-          // Priorizar voces en español (Latinoamérica, Colombia, México o España)
           this.cachedVoice = voices.find(v => v.lang === 'es-CO' || v.lang === 'es_CO')
             || voices.find(v => v.lang === 'es-419')
             || voices.find(v => v.lang === 'es-US' || v.lang === 'es_US')
             || voices.find(v => v.lang === 'es-MX' || v.lang === 'es_MX')
-            || voices.find(v => v.lang.startsWith('es') || v.lang.includes('Spanish') || v.name.toLowerCase().includes('spanish'))
+            || voices.find(v => v.lang.startsWith('es') || v.lang.includes('Spanish'))
             || voices[0];
           this.voicesInitialized = true;
         }
@@ -97,83 +97,115 @@ class SoundService {
   }
 
   /**
-   * Pronuncia el llamado usando Web Speech API y fallback de Audio Stream (Smart TV & Mobile)
+   * Detiene cualquier locución o audio en curso antes de iniciar uno nuevo
    */
-  static speak(text, options = {}) {
-    if (typeof window === 'undefined') return;
-
-    let spokenLocally = false;
-
-    // 1. Intentar Web Speech API si está disponible en el navegador
-    if (typeof window.speechSynthesis !== 'undefined' && window.speechSynthesis) {
+  static stopAll() {
+    if (this.currentAudio) {
       try {
-        this.initVoices();
-        if (window.speechSynthesis.paused) {
-          window.speechSynthesis.resume();
-        }
+        this.currentAudio.pause();
+        this.currentAudio.currentTime = 0;
+      } catch { }
+      this.currentAudio = null;
+    }
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      try {
         window.speechSynthesis.cancel();
-
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.rate = options.rate || 0.88; // Pausado y natural
-        utterance.pitch = options.pitch || 1.0;
-        utterance.volume = options.volume !== undefined ? options.volume : 1.0;
-
-        const voices = window.speechSynthesis.getVoices();
-        const spanish = voices.find(v => v.lang && (v.lang.startsWith('es') || v.lang.includes('Spanish')));
-        if (spanish) {
-          utterance.voice = spanish;
-          utterance.lang = spanish.lang;
-        } else {
-          utterance.lang = 'es-ES';
-        }
-
-        let started = false;
-        utterance.onstart = () => {
-          started = true;
-        };
-        utterance.onerror = (e) => {
-          console.warn('SpeechSynthesis error, ejecutando audio stream fallback:', e);
-          this.playAudioStream(text, options.volume);
-        };
-
-        window.speechSynthesis.speak(utterance);
-        spokenLocally = true;
-
-        // Si tras 700ms no ha iniciado (común en Smart TVs sin paquete TTS), usar stream de audio
-        setTimeout(() => {
-          if (!started && !window.speechSynthesis.speaking) {
-            this.playAudioStream(text, options.volume);
-          }
-        }, 700);
-
-      } catch (e) {
-        console.warn('Fallo en SpeechSynthesis local:', e);
-      }
-    }
-
-    if (!spokenLocally) {
-      this.playAudioStream(text, options.volume);
-    }
-  }
-
-  static playAudioStream(text, volume = 1.0) {
-    try {
-      const cleanText = encodeURIComponent(text);
-      const url = `/api/tts?text=${cleanText}`;
-      const audio = new Audio(url);
-      audio.volume = volume !== undefined ? volume : 1.0;
-      audio.play().catch(e => {
-        console.warn('Audio stream error:', e);
-      });
-    } catch (e) {
-      console.warn('No se pudo reproducir audio stream:', e);
+      } catch { }
     }
   }
 
   /**
-   * Formatea el turno para que la voz lo pronuncie de manera clara y natural
-   * ej: "A-001" -> "A, cero cero uno"
-   * ej: "P-012" -> "P, cero uno dos"
+   * Reproduce una locución única con callback onComplete al finalizar
+   */
+  static playSpeechOnce(text, volume = 1.0, onComplete) {
+    if (typeof window === 'undefined') return;
+
+    // 1. Intentar con el stream de audio del servidor (/api/tts)
+    try {
+      const cleanText = encodeURIComponent(text);
+      const url = `/api/tts?text=${cleanText}`;
+      const audio = new Audio(url);
+      audio.volume = volume;
+      this.currentAudio = audio;
+
+      let handled = false;
+      const finish = () => {
+        if (!handled) {
+          handled = true;
+          this.currentAudio = null;
+          if (onComplete) onComplete();
+        }
+      };
+
+      audio.onended = finish;
+      audio.onerror = () => {
+        console.warn('Audio stream error, usando SpeechSynthesis local');
+        this.playLocalSpeechOnce(text, volume, onComplete);
+      };
+
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(() => {
+          this.playLocalSpeechOnce(text, volume, onComplete);
+        });
+      }
+      return;
+    } catch (e) {
+      console.warn('Error al iniciar audio stream:', e);
+    }
+
+    // 2. Fallback SpeechSynthesis
+    this.playLocalSpeechOnce(text, volume, onComplete);
+  }
+
+  /**
+   * Fallback de síntesis de voz local con callback onComplete
+   */
+  static playLocalSpeechOnce(text, volume = 1.0, onComplete) {
+    if (typeof window === 'undefined' || !window.speechSynthesis) {
+      if (onComplete) onComplete();
+      return;
+    }
+
+    try {
+      this.initVoices();
+      if (window.speechSynthesis.paused) window.speechSynthesis.resume();
+      window.speechSynthesis.cancel();
+
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 0.88;
+      utterance.pitch = 1.0;
+      utterance.volume = volume;
+
+      const voices = window.speechSynthesis.getVoices();
+      const spanish = voices.find(v => v.lang && (v.lang.startsWith('es') || v.lang.includes('Spanish')));
+      if (spanish) {
+        utterance.voice = spanish;
+        utterance.lang = spanish.lang;
+      } else {
+        utterance.lang = 'es-ES';
+      }
+
+      let handled = false;
+      const finish = () => {
+        if (!handled) {
+          handled = true;
+          if (onComplete) onComplete();
+        }
+      };
+
+      utterance.onend = finish;
+      utterance.onerror = finish;
+
+      window.speechSynthesis.speak(utterance);
+    } catch (e) {
+      console.warn('SpeechSynthesis error:', e);
+      if (onComplete) onComplete();
+    }
+  }
+
+  /**
+   * Formatea el turno para pronunciación clara (ej: "A-001" -> "A, cero cero uno")
    */
   static formatTicketForSpeech(ticketNumber) {
     if (!ticketNumber) return '';
@@ -187,11 +219,11 @@ class SoundService {
   }
 
   /**
-   * Llamado completo: Campana + Locución hablada
+   * Llamado Completo Secuencial: Campana -> Voz 1 -> Pausa -> Campana -> Voz 2 (Sin solapamientos)
    */
-  static announceTicket({ ticketNumber, counterName, template, playSound = true, playVoice = true, volume = 1.0, repetitions = 1 }) {
+  static announceTicket({ ticketNumber, counterName, template, playSound = true, playVoice = true, volume = 1.0, repetitions = 2 }) {
     this.getAudioContext();
-    this.initVoices();
+    this.stopAll();
 
     if (playSound) {
       this.playChime(volume);
@@ -205,19 +237,23 @@ class SoundService {
         ? template.replace('{ticket}', spokenTicket).replace('{counter}', spokenCounter)
         : `Turno ${spokenTicket}, por favor pasar a ${spokenCounter}`;
 
-      // Retardo de 500ms tras la campana para iniciar la voz
+      // Esperar 450ms a que termine el primer tono de la campana
       setTimeout(() => {
-        this.speak(speechText, { volume });
-
-        if (repetitions > 1) {
-          setTimeout(() => {
-            if (playSound) this.playChime(volume * 0.85);
+        // Primera Locución
+        this.playSpeechOnce(speechText, volume, () => {
+          // Callback que se ejecuta ÚNICAMENTE cuando la 1ra locución haya terminado
+          if (repetitions > 1) {
+            // Pausa agradable de 1.2 segundos entre el primer y el segundo llamado
             setTimeout(() => {
-              this.speak(speechText, { volume });
-            }, 500);
-          }, 4200);
-        }
-      }, 500);
+              if (playSound) this.playChime(volume * 0.85);
+              setTimeout(() => {
+                // Segunda Locución
+                this.playSpeechOnce(speechText, volume);
+              }, 400);
+            }, 1200);
+          }
+        });
+      }, 450);
     }
   }
 }
