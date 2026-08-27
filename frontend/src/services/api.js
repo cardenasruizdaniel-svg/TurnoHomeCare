@@ -82,10 +82,12 @@ export const api = {
   createUser: (data) => request('/users', { method: 'POST', body: JSON.stringify(data) }),
   updateUser: (id, data) => request(`/users/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
 
-  // Configuración
+  // Configuración y Copias de Seguridad
   getSettings: () => request('/settings'),
   updateSettings: (payload) => request('/settings', { method: 'POST', body: JSON.stringify(payload) }),
   resetDailyQueue: (branchId) => request('/settings/reset-daily-queue', { method: 'POST', body: JSON.stringify({ branchId }) }),
+  getBackupDownloadUrl: () => `${API_BASE}/settings/backup/download?token=${localStorage.getItem('deaturnos_token') || ''}`,
+  createBackupSnapshot: () => request('/settings/backup/create', { method: 'POST' }),
 
   // Túnel de Acceso Público (4G/5G)
   getTunnelStatus: () => request('/tunnel/status'),

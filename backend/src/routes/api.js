@@ -86,10 +86,12 @@ router.get('/roles', authenticateToken, requireRole(['ADMIN']), UserController.g
 router.post('/users', authenticateToken, requireRole(['ADMIN']), UserController.create);
 router.put('/users/:id', authenticateToken, requireRole(['ADMIN']), UserController.update);
 
-// Configuraciones del Sistema
+// Configuraciones del Sistema y Copias de Seguridad
 router.get('/settings', authenticateToken, SettingsController.getAll);
 router.post('/settings', authenticateToken, requireRole(['ADMIN']), SettingsController.updateBatch);
 router.post('/settings/reset-daily-queue', authenticateToken, requireRole(['ADMIN']), SettingsController.resetDailyQueue);
+router.get('/settings/backup/download', authenticateToken, requireRole(['ADMIN']), SettingsController.downloadBackup);
+router.post('/settings/backup/create', authenticateToken, requireRole(['ADMIN']), SettingsController.createBackupSnapshot);
 
 // Auditoría
 router.get('/audit', authenticateToken, requireRole(['ADMIN', 'SUPERVISOR']), AuditController.getLogs);

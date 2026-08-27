@@ -75,6 +75,36 @@ class SettingsController {
       res.status(400).json({ success: false, error: err.message });
     }
   }
+
+  static downloadBackup(req, res) {
+    try {
+      const BackupService = require('../services/backupService');
+      const buffer = BackupService.getBackupBuffer();
+      if (!buffer) {
+        return res.status(404).json({ success: false, error: 'NO_DATABASE_FILE' });
+      }
+
+      const today = new Date().toISOString().slice(0, 10);
+      res.setHeader('Content-Disposition', `attachment; filename="deaturnos_backup_${today}.db"`);
+      res.setHeader('Content-Type', 'application/x-sqlite3');
+      res.send(buffer);
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
+  static createBackupSnapshot(req, res) {
+    try {
+      const BackupService = require('../services/backupService');
+      const backupPath = BackupService.createBackup();
+      if (!backupPath) {
+        return res.status(500).json({ success: false, error: 'ERROR_CREATING_BACKUP' });
+      }
+      res.json({ success: true, message: 'Copia de respaldo generada exitosamente en disco.', path: backupPath });
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  }
 }
 
 module.exports = SettingsController;

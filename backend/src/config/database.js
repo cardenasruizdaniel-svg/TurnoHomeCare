@@ -3,7 +3,14 @@ const fs = require('fs');
 const path = require('path');
 require('dotenv').config();
 
-const dbPath = process.env.DB_PATH || path.join(__dirname, '../../data/deaturnos.db');
+function resolveDbPath() {
+  if (process.env.DB_PATH) return process.env.DB_PATH;
+  if (fs.existsSync('/var/data')) return '/var/data/deaturnos.db';
+  if (fs.existsSync('/data')) return '/data/deaturnos.db';
+  return path.join(__dirname, '../../data/deaturnos.db');
+}
+
+const dbPath = resolveDbPath();
 const dbDir = path.dirname(path.resolve(dbPath));
 
 if (!fs.existsSync(dbDir)) {
@@ -164,6 +171,10 @@ const dbWrapper = {
 
   persistToDisk() {
     persistToDisk();
+  },
+
+  getDbPath() {
+    return dbPath;
   }
 };
 

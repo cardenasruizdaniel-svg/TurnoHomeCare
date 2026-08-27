@@ -16,10 +16,13 @@ import {
   RotateCcw,
   Image,
   Tv,
-  Plus,
   Trash2,
   Megaphone,
-  Upload
+  Upload,
+  Database,
+  Download,
+  HardDrive,
+  ShieldCheck
 } from 'lucide-react';
 import { api } from '../../services/api';
 import { useBranding } from '../../context/BrandingContext';
@@ -200,6 +203,27 @@ export function AdminSettingsView() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const [backupLoading, setBackupLoading] = useState(false);
+
+  const handleCreateSnapshot = async () => {
+    setBackupLoading(true);
+    setErrorMsg('');
+    try {
+      const res = await api.createBackupSnapshot();
+      if (res.success) {
+        setSuccessMsg(res.message || 'Copia de respaldo generada exitosamente.');
+      }
+    } catch (e) {
+      setErrorMsg(e.message || 'Error al generar respaldo.');
+    } finally {
+      setBackupLoading(false);
+    }
+  };
+
+  const handleDownloadBackup = () => {
+    window.open(api.getBackupDownloadUrl(), '_blank');
   };
 
   const handleAddBanner = () => {
@@ -1063,6 +1087,73 @@ export function AdminSettingsView() {
                   </div>
                 </div>
 
+              </div>
+            </div>
+
+          </div>
+
+          {/* ============================================================= */}
+          {/* SECCIÓN 7: SEGURIDAD, PERSISTENCIA Y COPIAS DE RESPALDO */}
+          {/* ============================================================= */}
+          <div className="rounded-3xl bg-slate-900 border border-slate-800 p-6 sm:p-8 shadow-xl space-y-6">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  <ShieldCheck className="w-6 h-6" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold font-display text-white">PROTECCIÓN Y COPIAS DE SEGURIDAD</h2>
+                  <p className="text-xs text-slate-400">Garantía de cero pérdida de datos y respaldos descargables en cualquier momento.</p>
+                </div>
+              </div>
+              <span className="px-3 py-1 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 text-xs font-bold flex items-center gap-1.5">
+                <HardDrive className="w-3.5 h-3.5 text-emerald-400" />
+                Persistencia Activa
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
+                <div className="flex items-center gap-2 text-slate-200 font-bold">
+                  <Database className="w-4 h-4 text-sky-400" />
+                  <span>Política de Actualizaciones Seguras</span>
+                </div>
+                <p className="text-slate-400 leading-relaxed text-[11px]">
+                  Todas las actualizaciones del sistema se ejecutan como <strong>mejoras puramente aditivas</strong>. El sistema nunca borra ni trunca pacientes, turnos, banners ni configuraciones al subir nuevas versiones.
+                </p>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center gap-2 text-slate-200 font-bold">
+                    <Download className="w-4 h-4 text-emerald-400" />
+                    <span>Descarga Directa de Respaldo (.db)</span>
+                  </div>
+                  <p className="text-slate-400 text-[11px] mt-1">
+                    Descarga una copia exacta y completa de la base de datos SQLite con todos los registros actuales.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={handleDownloadBackup}
+                    className="flex-1 py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/20 transition flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>Descargar Base de Datos (.db)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleCreateSnapshot}
+                    disabled={backupLoading}
+                    className="py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-bold text-xs transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                  >
+                    <Save className="w-4 h-4" />
+                    <span>{backupLoading ? 'Creando...' : 'Crear Punto Snapshot'}</span>
+                  </button>
+                </div>
               </div>
             </div>
 
