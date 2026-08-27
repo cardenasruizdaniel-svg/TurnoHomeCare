@@ -265,29 +265,34 @@ export function StaffDeskView() {
     }
   };
 
-  // 7. DERIVAR / TRANSFERIR A CONSULTORIO O SERVICIO
+  // 7. DERIVAR / REASIGNAR A CONSULTORIO O SERVICIO
   const handleTransferTicket = async (e) => {
     if (e) e.preventDefault();
     if (!currentTicket) return;
     setActionLoading(true);
+    const ticketToDerive = currentTicket;
+    
+    // Cerrar inmediatamente el modal y liberar el puesto para volver de inmediato al panel de atención
+    setIsTransferModalOpen(false);
+    setCurrentTicket(null);
+
     try {
-      const res = await api.transferTicket(currentTicket.id, {
+      const res = await api.transferTicket(ticketToDerive.id, {
         targetServiceId: targetServiceId || null,
         targetCounterId: targetCounterId || null,
         notes: transferNotes,
         fromCounterId: selectedCounterId
       });
       if (res.success) {
-        setSuccessMsg(`Turno ${currentTicket.ticket_number} derivado exitosamente.`);
-        setCurrentTicket(null);
+        setSuccessMsg(`Turno ${ticketToDerive.ticket_number} derivado y reasignado exitosamente.`);
         setTransferNotes('');
         setTargetCounterId('');
         setTargetServiceId('');
-        setIsTransferModalOpen(false);
-        loadQueueAndStatus();
+        await loadQueueAndStatus();
       }
     } catch (err) {
       setErrorMsg(err.message || 'Error al derivar turno');
+      await loadQueueAndStatus();
     } finally {
       setActionLoading(false);
     }
