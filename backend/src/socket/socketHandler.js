@@ -66,6 +66,11 @@ function emitTicketStatusChanged(branchId, ticketData) {
   }
 }
 
+function emitQueueUpdated(branchId) {
+  if (!ioInstance) return;
+  ioInstance.to(`branch_${branchId}`).emit('queue:updated', { branchId });
+}
+
 function emitConfigUpdated(branchId = null) {
   if (!ioInstance) return;
   if (branchId) {
@@ -82,5 +87,6 @@ module.exports = {
   emitTicketCalled,
   emitTicketRecalled,
   emitTicketStatusChanged,
+  emitQueueUpdated,
   emitConfigUpdated
 };
