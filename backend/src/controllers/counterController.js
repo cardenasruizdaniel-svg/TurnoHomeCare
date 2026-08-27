@@ -117,6 +117,32 @@ class CounterController {
       res.status(400).json({ success: false, error: err.message });
     }
   }
+
+  static delete(req, res) {
+    try {
+      const { id } = req.params;
+      const existing = db.prepare('SELECT * FROM counters WHERE id = ?').get(id);
+      if (!existing) return res.status(404).json({ success: false, error: 'MODULO_NO_ENCONTRADO' });
+
+      const transaction = db.transaction(() => {
+        db.prepare('DELETE FROM counter_services WHERE counter_id = ?').run(id);
+        db.prepare('DELETE FROM counters WHERE id = ?').run(id);
+      });
+      transaction();
+
+      AuditService.log({
+        userId: req.user ? req.user.id : null,
+        action: 'DELETE_COUNTER',
+        entity: 'COUNTER',
+        entityId: id,
+        details: { name: existing.name, code: existing.code }
+      });
+
+      res.json({ success: true, message: 'Módulo eliminado correctamente' });
+    } catch (err) {
+      res.status(400).json({ success: false, error: err.message });
+    }
+  }
 }
 
 module.exports = CounterController;

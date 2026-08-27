@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Building2, Plus, Edit, QrCode, Download, Printer, ExternalLink } from 'lucide-react';
+import { Building2, Plus, Edit, Trash2, QrCode, Download, Printer, ExternalLink, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { api } from '../../services/api';
 import { Modal, LoadingSpinner } from '../../components/Modal';
@@ -8,6 +8,7 @@ export function AdminBranchesView() {
   const [branches, setBranches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
 
   // Modal QR Print
   const [qrModalBranch, setQrModalBranch] = useState(null);
@@ -65,16 +66,36 @@ export function AdminBranchesView() {
 
   const handleSave = async (e) => {
     e.preventDefault();
+    setErrorMsg('');
     try {
       if (editingBranch) {
         await api.updateBranch(editingBranch.id, formData);
+        setSuccessMsg('Sede actualizada exitosamente.');
       } else {
         await api.createBranch(formData);
+        setSuccessMsg('Sede creada exitosamente.');
       }
       setIsModalOpen(false);
       loadBranches();
     } catch (err) {
       setErrorMsg(err.message);
+    }
+  };
+
+  const handleDeleteBranch = async (id, name) => {
+    if (!window.confirm(`¿Estás seguro de que deseas eliminar la sede "${name}"? Esta acción no se puede deshacer.`)) {
+      return;
+    }
+    setErrorMsg('');
+    setSuccessMsg('');
+    try {
+      const res = await api.deleteBranch(id);
+      if (res.success) {
+        setSuccessMsg(`Sede "${name}" eliminada exitosamente.`);
+        loadBranches();
+      }
+    } catch (err) {
+      setErrorMsg(err.message || 'No se pudo eliminar la sede.');
     }
   };
 
@@ -100,6 +121,19 @@ export function AdminBranchesView() {
           <span>Nueva Sede</span>
         </button>
       </div>
+
+      {errorMsg && (
+        <div className="p-4 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs font-semibold flex items-center gap-2">
+          <AlertCircle className="w-5 h-5 shrink-0" />
+          <span>{errorMsg}</span>
+        </div>
+      )}
+      {successMsg && (
+        <div className="p-4 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-semibold flex items-center gap-2">
+          <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-400" />
+          <span>{successMsg}</span>
+        </div>
+      )}
 
       {/* Branches Grid */}
       {loading ? (
@@ -140,7 +174,7 @@ export function AdminBranchesView() {
                   <span>Ver / Imprimir QR</span>
                 </button>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
                   <a
                     href={`/pantalla?branchId=${b.id}`}
                     target="_blank"
@@ -152,8 +186,16 @@ export function AdminBranchesView() {
                   <button
                     onClick={() => openEditModal(b)}
                     className="p-2 rounded-lg bg-slate-800 hover:bg-sky-600 text-slate-400 hover:text-white transition"
+                    title="Editar sede"
                   >
                     <Edit className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => handleDeleteBranch(b.id, b.name)}
+                    className="p-2 rounded-lg bg-slate-800 hover:bg-rose-600 text-slate-400 hover:text-white transition"
+                    title="Eliminar sede"
+                  >
+                    <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
               </div>

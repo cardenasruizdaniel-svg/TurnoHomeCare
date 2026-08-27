@@ -64,17 +64,20 @@ export const api = {
   createService: (data) => request('/services', { method: 'POST', body: JSON.stringify(data) }),
   updateService: (id, data) => request(`/services/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   toggleServiceActive: (id) => request(`/services/${id}/toggle`, { method: 'PATCH' }),
+  deleteService: (id) => request(`/services/${id}`, { method: 'DELETE' }),
 
   // CRUD Módulos
   getCounters: (branchId) => request(`/counters${branchId ? `?branchId=${branchId}` : ''}`),
   createCounter: (data) => request('/counters', { method: 'POST', body: JSON.stringify(data) }),
   updateCounter: (id, data) => request(`/counters/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteCounter: (id) => request(`/counters/${id}`, { method: 'DELETE' }),
 
   // CRUD Sedes
   getBranches: () => request('/branches'),
   getBranch: (id) => request(`/branches/${id}`),
   createBranch: (data) => request('/branches', { method: 'POST', body: JSON.stringify(data) }),
   updateBranch: (id, data) => request(`/branches/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteBranch: (id) => request(`/branches/${id}`, { method: 'DELETE' }),
 
   // CRUD Usuarios y Roles
   getUsers: () => request('/users'),

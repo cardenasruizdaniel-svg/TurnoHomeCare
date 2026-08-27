@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Stethoscope, Plus, Edit, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { Stethoscope, Plus, Edit, Trash2, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import { api } from '../../services/api';
 import { Modal, LoadingSpinner } from '../../components/Modal';
 
@@ -93,6 +93,23 @@ export function AdminServicesView() {
     }
   };
 
+  const handleDeleteService = async (id, name) => {
+    if (!window.confirm(`¿Estás seguro de que deseas eliminar permanentemente el servicio "${name}"?`)) {
+      return;
+    }
+    setErrorMsg('');
+    setSuccessMsg('');
+    try {
+      const res = await api.deleteService(id);
+      if (res.success) {
+        setSuccessMsg(`Servicio "${name}" eliminado con éxito.`);
+        loadServices();
+      }
+    } catch (err) {
+      setErrorMsg(err.message || 'No se pudo eliminar el servicio.');
+    }
+  };
+
   return (
     <div className="space-y-6">
       
@@ -167,12 +184,22 @@ export function AdminServicesView() {
                   {s.is_active ? '● Activo' : '○ Inactivo'}
                 </button>
 
-                <button
-                  onClick={() => openEditModal(s)}
-                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-sky-600 text-slate-400 hover:text-white transition"
-                >
-                  <Edit className="w-4 h-4" />
-                </button>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => openEditModal(s)}
+                    className="p-1.5 rounded-lg bg-slate-800 hover:bg-sky-600 text-slate-400 hover:text-white transition"
+                    title="Editar servicio"
+                  >
+                    <Edit className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => handleDeleteService(s.id, s.name)}
+                    className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-600 text-slate-400 hover:text-white transition"
+                    title="Eliminar servicio"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             </div>
           ))}

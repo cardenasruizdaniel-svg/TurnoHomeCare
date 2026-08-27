@@ -132,6 +132,37 @@ class BranchController {
       res.status(400).json({ success: false, error: err.message });
     }
   }
+
+  static delete(req, res) {
+    try {
+      const { id } = req.params;
+      const existing = db.prepare('SELECT * FROM branches WHERE id = ?').get(id);
+      if (!existing) return res.status(404).json({ success: false, error: 'SEDE_NO_ENCONTRADA' });
+
+      const countRow = db.prepare('SELECT COUNT(*) as total FROM branches').get();
+      if (countRow && countRow.total <= 1) {
+        return res.status(400).json({ success: false, error: 'NO_SE_PUEDE_ELIMINAR_UNICA_SEDE', message: 'Debe existir al menos una sede principal en el sistema.' });
+      }
+
+      const transaction = db.transaction(() => {
+        db.prepare('DELETE FROM counters WHERE branch_id = ?').run(id);
+        db.prepare('DELETE FROM branches WHERE id = ?').run(id);
+      });
+      transaction();
+
+      AuditService.log({
+        userId: req.user ? req.user.id : null,
+        action: 'DELETE_BRANCH',
+        entity: 'BRANCH',
+        entityId: id,
+        details: { name: existing.name, code: existing.code }
+      });
+
+      res.json({ success: true, message: 'Sede eliminada exitosamente' });
+    } catch (err) {
+      res.status(400).json({ success: false, error: err.message });
+    }
+  }
 }
 
 module.exports = BranchController;

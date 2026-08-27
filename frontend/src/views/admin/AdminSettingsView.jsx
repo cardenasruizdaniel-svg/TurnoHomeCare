@@ -62,26 +62,42 @@ export function AdminSettingsView() {
     BANNERS_PUBLICIDAD: [
       {
         id: 'b1',
-        title: 'HomeCare del Quindío I.P.S.',
-        subtitle: 'Bienestar y atención médica con calidez humana en la comodidad de su hogar.',
-        tag: 'Bienestar en Casa',
-        imageUrl: 'https://images.unsplash.com/photo-1584515979956-d9f6e5d09982?w=800&auto=format&fit=crop&q=80',
+        title: 'Clínica de Heridas & Cuidadoras',
+        subtitle: 'Atención especializada en heridas y asistencia personalizada con calidez humana en casa.',
+        tag: 'Atención Domiciliaria',
+        imageUrl: '/banners/banner_heridas_cuidadoras.png',
         isActive: true
       },
       {
         id: 'b2',
-        title: 'Citas y Consultas Médicas',
-        subtitle: 'Medicina general, terapia física, nutrición y toma de muestras a domicilio.',
-        tag: 'Nuestros Servicios',
-        imageUrl: 'https://images.unsplash.com/photo-1629909613654-28e377c37b09?w=800&auto=format&fit=crop&q=80',
+        title: 'Pedagogía Infantil & Toma de Muestras',
+        subtitle: 'Educación adaptada a tus hijos y laboratorio clínico en la comodidad de tu hogar.',
+        tag: 'Salud y Educación',
+        imageUrl: '/banners/banner_pedagogia_muestras.png',
         isActive: true
       },
       {
         id: 'b3',
-        title: 'Atención Ágil y Sin Filas',
-        subtitle: 'Escanea el código QR con tu celular y sigue tu turno en tiempo real.',
-        tag: 'Turno Móvil',
-        imageUrl: 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=800&auto=format&fit=crop&q=80',
+        title: 'Psicología, Nutrición y Dietética',
+        subtitle: 'Terapia emocional, manejo del estrés y planes alimenticios saludables para toda la familia.',
+        tag: 'Bienestar Integral',
+        imageUrl: '/banners/banner_psicologia_nutricion.png',
+        isActive: true
+      },
+      {
+        id: 'b4',
+        title: 'Fonoaudiología & Fisioterapia',
+        subtitle: 'Terapia del lenguaje, deglución y rehabilitación física integral en el hogar.',
+        tag: 'Rehabilitación en Casa',
+        imageUrl: '/banners/banner_fono_fisioterapia.png',
+        isActive: true
+      },
+      {
+        id: 'b5',
+        title: 'Terapia Ocupacional & Terapia Respiratoria',
+        subtitle: 'Desarrollo cognitivo y motor, junto a cuidado respiratorio especializado domiciliario.',
+        tag: 'Terapia Especializada',
+        imageUrl: '/banners/banner_ocupacional_respiratoria.png',
         isActive: true
       }
     ]
@@ -283,31 +299,47 @@ export function AdminSettingsView() {
       BANNERS_PUBLICIDAD: [
         {
           id: 'b1',
-          title: 'HomeCare del Quindío I.P.S.',
-          subtitle: 'Bienestar y atención médica con calidez humana en la comodidad de su hogar.',
-          tag: 'Bienestar en Casa',
-          imageUrl: 'https://images.unsplash.com/photo-1584515979956-d9f6e5d09982?w=800&auto=format&fit=crop&q=80',
+          title: 'Clínica de Heridas & Cuidadoras',
+          subtitle: 'Atención especializada en heridas y asistencia personalizada con calidez humana en casa.',
+          tag: 'Atención Domiciliaria',
+          imageUrl: '/banners/banner_heridas_cuidadoras.png',
           isActive: true
         },
         {
           id: 'b2',
-          title: 'Citas y Consultas Médicas',
-          subtitle: 'Medicina general, terapia física y respiratoria, nutrición y toma de muestras.',
-          tag: 'Nuestros Servicios',
-          imageUrl: 'https://images.unsplash.com/photo-1629909613654-28e377c37b09?w=800&auto=format&fit=crop&q=80',
+          title: 'Pedagogía Infantil & Toma de Muestras',
+          subtitle: 'Educación adaptada a tus hijos y laboratorio clínico en la comodidad de tu hogar.',
+          tag: 'Salud y Educación',
+          imageUrl: '/banners/banner_pedagogia_muestras.png',
           isActive: true
         },
         {
           id: 'b3',
-          title: 'Atención Ágil y Sin Filas',
-          subtitle: 'Escanea el código QR con tu celular y sigue tu turno en tiempo real.',
-          tag: 'Turno Móvil',
-          imageUrl: 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=800&auto=format&fit=crop&q=80',
+          title: 'Psicología, Nutrición y Dietética',
+          subtitle: 'Terapia emocional, manejo del estrés y planes alimenticios saludables para toda la familia.',
+          tag: 'Bienestar Integral',
+          imageUrl: '/banners/banner_psicologia_nutricion.png',
+          isActive: true
+        },
+        {
+          id: 'b4',
+          title: 'Fonoaudiología & Fisioterapia',
+          subtitle: 'Terapia del lenguaje, deglución y rehabilitación física integral en el hogar.',
+          tag: 'Rehabilitación en Casa',
+          imageUrl: '/banners/banner_fono_fisioterapia.png',
+          isActive: true
+        },
+        {
+          id: 'b5',
+          title: 'Terapia Ocupacional & Terapia Respiratoria',
+          subtitle: 'Desarrollo cognitivo y motor, junto a cuidado respiratorio especializado domiciliario.',
+          tag: 'Terapia Especializada',
+          imageUrl: '/banners/banner_ocupacional_respiratoria.png',
           isActive: true
         }
       ]
     }));
-    setSuccessMsg('Plantilla publicitaria de HomeCare IPS cargada.');
+    setSuccessMsg('Plantilla publicitaria oficial de HomeCare IPS cargada.');
   };
 
   const processImageFile = (file, maxWidth = 1200, quality = 0.85) => {

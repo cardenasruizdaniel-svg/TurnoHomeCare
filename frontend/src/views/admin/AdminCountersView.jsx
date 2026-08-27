@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Grid3X3, Plus, Edit, Stethoscope, AlertCircle, Building2, CheckCircle2 } from 'lucide-react';
+import { Grid3X3, Plus, Edit, Trash2, Stethoscope, AlertCircle, Building2, CheckCircle2 } from 'lucide-react';
 import { api } from '../../services/api';
 import { Modal, LoadingSpinner } from '../../components/Modal';
 
@@ -9,6 +9,7 @@ export function AdminCountersView() {
   const [branches, setBranches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
 
   // Modal Crear / Editar
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -70,13 +71,32 @@ export function AdminCountersView() {
     try {
       if (editingCounter) {
         await api.updateCounter(editingCounter.id, formData);
+        setSuccessMsg('Módulo actualizado con éxito.');
       } else {
         await api.createCounter(formData);
+        setSuccessMsg('Módulo creado con éxito.');
       }
       setIsModalOpen(false);
       loadData();
     } catch (err) {
       setErrorMsg(err.message);
+    }
+  };
+
+  const handleDeleteCounter = async (id, name) => {
+    if (!window.confirm(`¿Estás seguro de que deseas eliminar el puesto/módulo "${name}"?`)) {
+      return;
+    }
+    setErrorMsg('');
+    setSuccessMsg('');
+    try {
+      const res = await api.deleteCounter(id);
+      if (res.success) {
+        setSuccessMsg(`Módulo "${name}" eliminado con éxito.`);
+        loadData();
+      }
+    } catch (err) {
+      setErrorMsg(err.message || 'No se pudo eliminar el módulo.');
     }
   };
 
@@ -107,6 +127,19 @@ export function AdminCountersView() {
           <span>Nuevo Módulo</span>
         </button>
       </div>
+
+      {errorMsg && (
+        <div className="p-4 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs font-semibold flex items-center gap-2">
+          <AlertCircle className="w-5 h-5 shrink-0" />
+          <span>{errorMsg}</span>
+        </div>
+      )}
+      {successMsg && (
+        <div className="p-4 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-semibold flex items-center gap-2">
+          <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-400" />
+          <span>{successMsg}</span>
+        </div>
+      )}
 
       {/* Counters Grid */}
       {loading ? (
@@ -152,12 +185,22 @@ export function AdminCountersView() {
 
               <div className="flex items-center justify-between pt-4 mt-4 border-t border-slate-800">
                 <span className="text-xs text-emerald-400 font-semibold">● Habilitado</span>
-                <button
-                  onClick={() => openEditModal(c)}
-                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-sky-600 text-slate-400 hover:text-white transition"
-                >
-                  <Edit className="w-4 h-4" />
-                </button>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => openEditModal(c)}
+                    className="p-1.5 rounded-lg bg-slate-800 hover:bg-sky-600 text-slate-400 hover:text-white transition"
+                    title="Editar módulo"
+                  >
+                    <Edit className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => handleDeleteCounter(c.id, c.name)}
+                    className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-600 text-slate-400 hover:text-white transition"
+                    title="Eliminar módulo"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             </div>
           ))}

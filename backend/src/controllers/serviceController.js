@@ -116,6 +116,32 @@ class ServiceController {
       res.status(400).json({ success: false, error: err.message });
     }
   }
+
+  static delete(req, res) {
+    try {
+      const { id } = req.params;
+      const existing = db.prepare('SELECT * FROM services WHERE id = ?').get(id);
+      if (!existing) return res.status(404).json({ success: false, error: 'SERVICIO_NO_ENCONTRADO' });
+
+      const transaction = db.transaction(() => {
+        db.prepare('DELETE FROM counter_services WHERE service_id = ?').run(id);
+        db.prepare('DELETE FROM services WHERE id = ?').run(id);
+      });
+      transaction();
+
+      AuditService.log({
+        userId: req.user ? req.user.id : null,
+        action: 'DELETE_SERVICE',
+        entity: 'SERVICE',
+        entityId: id,
+        details: { name: existing.name, code: existing.code }
+      });
+
+      res.json({ success: true, message: 'Servicio eliminado correctamente' });
+    } catch (err) {
+      res.status(400).json({ success: false, error: err.message });
+    }
+  }
 }
 
 module.exports = ServiceController;

@@ -214,8 +214,61 @@ async function syncServicesAndCounters() {
       });
     }
 
+    // 4. Actualizar Banners Oficiales de HomeCare en la tabla de configuraciones
+    const officialBanners = [
+      {
+        id: "b1",
+        title: "Clínica de Heridas & Cuidadoras",
+        subtitle: "Atención especializada en heridas y asistencia personalizada con calidez humana en casa.",
+        tag: "Atención Domiciliaria",
+        imageUrl: "/banners/banner_heridas_cuidadoras.png",
+        isActive: true
+      },
+      {
+        id: "b2",
+        title: "Pedagogía Infantil & Toma de Muestras",
+        subtitle: "Educación adaptada a tus hijos y laboratorio clínico en la comodidad de tu hogar.",
+        tag: "Salud y Educación",
+        imageUrl: "/banners/banner_pedagogia_muestras.png",
+        isActive: true
+      },
+      {
+        id: "b3",
+        title: "Psicología, Nutrición y Dietética",
+        subtitle: "Terapia emocional, manejo del estrés y planes alimenticios saludables para toda la familia.",
+        tag: "Bienestar Integral",
+        imageUrl: "/banners/banner_psicologia_nutricion.png",
+        isActive: true
+      },
+      {
+        id: "b4",
+        title: "Fonoaudiología & Fisioterapia",
+        subtitle: "Terapia del lenguaje, deglución y rehabilitación física integral en el hogar.",
+        tag: "Rehabilitación en Casa",
+        imageUrl: "/banners/banner_fono_fisioterapia.png",
+        isActive: true
+      },
+      {
+        id: "b5",
+        title: "Terapia Ocupacional & Terapia Respiratoria",
+        subtitle: "Desarrollo cognitivo y motor, junto a cuidado respiratorio especializado domiciliario.",
+        tag: "Terapia Especializada",
+        imageUrl: "/banners/banner_ocupacional_respiratoria.png",
+        isActive: true
+      }
+    ];
+
+    const bannerSetting = db.prepare("SELECT id FROM settings WHERE key = 'BANNERS_PUBLICIDAD' AND branch_id IS NULL").get();
+    if (bannerSetting) {
+      db.prepare("UPDATE settings SET value = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+        .run(JSON.stringify(officialBanners), bannerSetting.id);
+    } else {
+      db.prepare("INSERT INTO settings (branch_id, key, value, description, data_type) VALUES (NULL, 'BANNERS_PUBLICIDAD', ?, 'Banners multimedia rotativos en pantalla de TV', 'json')")
+        .run(JSON.stringify(officialBanners));
+    }
+
     if (db.persistToDisk) db.persistToDisk();
-    console.log("Servicios y Modulos oficiales HomeCare del Quindio sincronizados exitosamente.");
+    console.log("Servicios, Modulos y Banners oficiales HomeCare del Quindio sincronizados exitosamente.");
   } catch (err) {
     console.error("Error sincronizando servicios y modulos:", err);
   }

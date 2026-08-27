@@ -68,17 +68,20 @@ router.get('/services', authenticateToken, ServiceController.getAll);
 router.post('/services', authenticateToken, requireRole(['ADMIN']), ServiceController.create);
 router.put('/services/:id', authenticateToken, requireRole(['ADMIN']), ServiceController.update);
 router.patch('/services/:id/toggle', authenticateToken, requireRole(['ADMIN']), ServiceController.toggleActive);
+router.delete('/services/:id', authenticateToken, requireRole(['ADMIN']), ServiceController.delete);
 
 // Módulos / Ventanillas
 router.get('/counters', authenticateToken, CounterController.getAll);
 router.post('/counters', authenticateToken, requireRole(['ADMIN']), CounterController.create);
 router.put('/counters/:id', authenticateToken, requireRole(['ADMIN']), CounterController.update);
+router.delete('/counters/:id', authenticateToken, requireRole(['ADMIN']), CounterController.delete);
 
 // Sedes
 router.get('/branches', authenticateToken, BranchController.getAll);
 router.get('/branches/:id', authenticateToken, BranchController.getById);
 router.post('/branches', authenticateToken, requireRole(['ADMIN']), BranchController.create);
 router.put('/branches/:id', authenticateToken, requireRole(['ADMIN']), BranchController.update);
+router.delete('/branches/:id', authenticateToken, requireRole(['ADMIN']), BranchController.delete);
 
 // Usuarios y Roles
 router.get('/users', authenticateToken, requireRole(['ADMIN', 'SUPERVISOR']), UserController.getAll);
