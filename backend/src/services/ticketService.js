@@ -225,7 +225,21 @@ class TicketService {
     `).all(branchId, ...assignedServices);
 
     if (waitingTickets.length === 0) {
-      return null;
+      // Fallback: Si no hay turnos para los servicios asignados, buscar en todos los turnos en espera de la sede
+      const fallbackTickets = db.prepare(`
+        SELECT t.*, s.name as service_name, p.full_name as patient_name, p.age as patient_age
+        FROM tickets t
+        JOIN services s ON t.service_id = s.id
+        JOIN patients p ON t.patient_id = p.id
+        WHERE t.branch_id = ?
+          AND t.status = 'ESPERANDO'
+        ORDER BY t.created_at ASC
+      `).all(branchId);
+
+      if (fallbackTickets.length === 0) {
+        return null;
+      }
+      return fallbackTickets[0];
     }
 
     const normalTickets = waitingTickets.filter(t => t.ticket_type === 'NORMAL');
@@ -711,14 +725,41 @@ class TicketService {
       ORDER BY t.created_at ASC
     `).all(branchId);
 
+    // Turno actualmente en atención o llamado en ESTE puesto/módulo
+    let counterActiveTicket = null;
+    if (counterId) {
+      counterActiveTicket = db.prepare(`
+        SELECT t.*, s.name as service_name, s.code as service_code,
+               c.name as counter_name, c.code as counter_code,
+               p.full_name as patient_name, p.document_number, p.age as patient_age, p.phone as patient_phone
+        FROM tickets t
+        JOIN services s ON t.service_id = s.id
+        JOIN patients p ON t.patient_id = p.id
+        LEFT JOIN counters c ON t.counter_id = c.id
+        WHERE t.counter_id = ? AND t.status IN ('LLAMADO', 'EN_ATENCION')
+        ORDER BY t.called_at DESC LIMIT 1
+      `).get(counterId);
+    }
+
+    // Conteo desglosado por servicio
+    const serviceCounts = db.prepare(`
+      SELECT s.id, s.name, s.code, s.letter_prefix, COUNT(t.id) as count
+      FROM services s
+      LEFT JOIN tickets t ON t.service_id = s.id AND t.status = 'ESPERANDO' AND t.branch_id = ?
+      WHERE s.is_active = 1
+      GROUP BY s.id
+    `).all(branchId);
+
     const recommended = counterId ? this.getNextRecommendedTicket(counterId, branchId) : null;
 
     return {
+      counter_active_ticket: counterActiveTicket || null,
       waiting_tickets: waiting,
       total_waiting: waiting.length,
       all_branch_waiting: allBranchWaiting,
       total_branch_waiting: allBranchWaiting.length,
       assigned_services: assignedServiceNames,
+      service_counts: serviceCounts || [],
       recommended_ticket: recommended || (allBranchWaiting.length > 0 ? allBranchWaiting[0] : null)
     };
   }
