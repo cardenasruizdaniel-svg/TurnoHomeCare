@@ -1,0 +1,582 @@
+import React, { useState, useEffect } from 'react';
+import {
+  UserCheck,
+  PhoneCall,
+  CheckCircle,
+  UserX,
+  PauseCircle,
+  Play,
+  RotateCcw,
+  Sparkles,
+  Users,
+  Building2,
+  Clock,
+  AlertCircle,
+  FileText
+} from 'lucide-react';
+import { api } from '../services/api';
+import { useAuth } from '../context/AuthContext';
+import { useSocket } from '../context/SocketContext';
+import { StatusBadge, TypeBadge } from '../components/StatusBadge';
+import { Modal } from '../components/Modal';
+
+export function StaffDeskView() {
+  const { user } = useAuth();
+  const { socket, joinBranch, connected } = useSocket();
+
+  const [counters, setCounters] = useState([]);
+  const [selectedCounterId, setSelectedCounterId] = useState(() => {
+    const saved = localStorage.getItem('deaturnos_staff_counter_id');
+    return saved ? Number(saved) : 1;
+  });
+
+  const [currentTicket, setCurrentTicket] = useState(null);
+  const [waitingTickets, setWaitingTickets] = useState([]);
+  const [allBranchWaiting, setAllBranchWaiting] = useState([]);
+  const [totalBranchWaiting, setTotalBranchWaiting] = useState(0);
+  const [assignedServices, setAssignedServices] = useState([]);
+  const [queueTab, setQueueTab] = useState('module'); // 'module' | 'all'
+  const [recommendedTicket, setRecommendedTicket] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
+
+  // Modal para finalizar con notas
+  const [isFinishModalOpen, setIsFinishModalOpen] = useState(false);
+  const [attentionNotes, setAttentionNotes] = useState('');
+
+  const branchId = user?.branch_id || 1;
+
+  // Cargar módulos/consultorios disponibles
+  useEffect(() => {
+    api.getCounters(branchId).then(res => {
+      if (res.success && res.counters) {
+        setCounters(res.counters);
+        if (res.counters.length > 0 && !selectedCounterId) {
+          setSelectedCounterId(res.counters[0].id);
+        }
+      }
+    });
+  }, [branchId]);
+
+  // Guardar módulo en localStorage
+  useEffect(() => {
+    if (selectedCounterId) {
+      localStorage.setItem('deaturnos_staff_counter_id', String(selectedCounterId));
+      loadQueueAndStatus();
+    }
+  }, [selectedCounterId]);
+
+  // Cargar cola y turno activo del módulo
+  const loadQueueAndStatus = async () => {
+    if (!selectedCounterId) return;
+    setLoading(true);
+    try {
+      const res = await api.getWaitingQueue(branchId, selectedCounterId);
+      if (res.success) {
+        setWaitingTickets(res.waiting_tickets || []);
+        setAllBranchWaiting(res.all_branch_waiting || []);
+        setTotalBranchWaiting(res.total_branch_waiting || 0);
+        setAssignedServices(res.assigned_services || []);
+        setRecommendedTicket(res.recommended_ticket || null);
+      }
+
+      // Buscar si el módulo tiene un turno en llamado o en atención
+      const dispRes = await api.getPublicDisplay(branchId);
+      if (dispRes.success) {
+        // Encontrar turno asignado a este módulo
+        const myActive = dispRes.current_ticket?.counter_id === selectedCounterId 
+          ? dispRes.current_ticket 
+          : null;
+        setCurrentTicket(myActive);
+      }
+    } catch (e) {
+      console.error('Error cargando cola:', e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Escuchar eventos en tiempo real
+  useEffect(() => {
+    if (connected && socket && branchId) {
+      joinBranch(branchId);
+
+      const handleUpdate = () => {
+        loadQueueAndStatus();
+      };
+
+      socket.on('ticket:created', handleUpdate);
+      socket.on('ticket:called', handleUpdate);
+      socket.on('ticket:recalled', handleUpdate);
+      socket.on('ticket:status_changed', handleUpdate);
+
+      return () => {
+        socket.off('ticket:created', handleUpdate);
+        socket.off('ticket:called', handleUpdate);
+        socket.off('ticket:recalled', handleUpdate);
+        socket.off('ticket:status_changed', handleUpdate);
+      };
+    }
+  }, [connected, socket, branchId, selectedCounterId]);
+
+  // 1. LLAMAR SIGUIENTE (Aplica algoritmo inteligente de prioridad)
+  const handleCallNext = async (specificTicketId = null) => {
+    if (!selectedCounterId) {
+      setErrorMsg('Selecciona un módulo o consultorio');
+      return;
+    }
+    setActionLoading(true);
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    try {
+      const res = await api.callNextTicket({
+        counterId: selectedCounterId,
+        branchId,
+        specificTicketId
+      });
+
+      if (res.success) {
+        if (res.calledTicket) {
+          setCurrentTicket(res.calledTicket);
+          setSuccessMsg(`Turno ${res.calledTicket.ticket_number} llamado.`);
+        } else {
+          setCurrentTicket(null);
+          setSuccessMsg('No hay más turnos en espera.');
+        }
+        loadQueueAndStatus();
+      }
+    } catch (err) {
+      setErrorMsg(err.message || 'Error al llamar turno');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // 2. RE-LLAMAR
+  const handleRecall = async () => {
+    if (!currentTicket) return;
+    setActionLoading(true);
+    try {
+      await api.recallTicket(currentTicket.id);
+      setSuccessMsg(`Re-llamando turno ${currentTicket.ticket_number}...`);
+      loadQueueAndStatus();
+    } catch (err) {
+      setErrorMsg(err.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // 3. INICIAR ATENCIÓN
+  const handleStartAttention = async () => {
+    if (!currentTicket) return;
+    setActionLoading(true);
+    try {
+      await api.startAttention(currentTicket.id);
+      setCurrentTicket(prev => ({ ...prev, status: 'EN_ATENCION' }));
+      setSuccessMsg('Atención iniciada.');
+      loadQueueAndStatus();
+    } catch (err) {
+      setErrorMsg(err.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // 4. FINALIZAR ATENCIÓN
+  const handleCompleteTicket = async () => {
+    if (!currentTicket) return;
+    setActionLoading(true);
+    try {
+      await api.completeTicket(currentTicket.id, attentionNotes);
+      setCurrentTicket(null);
+      setAttentionNotes('');
+      setIsFinishModalOpen(false);
+      setSuccessMsg('Atención finalizada con éxito.');
+      loadQueueAndStatus();
+    } catch (err) {
+      setErrorMsg(err.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // 5. NO SE PRESENTÓ
+  const handleNoShow = async () => {
+    if (!currentTicket) return;
+    if (!window.confirm(`¿Confirmas marcar el turno ${currentTicket.ticket_number} como "No se presentó"?`)) return;
+    setActionLoading(true);
+    try {
+      await api.markNoShow(currentTicket.id);
+      setCurrentTicket(null);
+      setSuccessMsg(`Turno ${currentTicket.ticket_number} marcado como No Presentó.`);
+      loadQueueAndStatus();
+    } catch (err) {
+      setErrorMsg(err.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // 6. PAUSAR
+  const handlePause = async () => {
+    if (!currentTicket) return;
+    setActionLoading(true);
+    try {
+      await api.pauseTicket(currentTicket.id);
+      setCurrentTicket(null);
+      setSuccessMsg(`Turno ${currentTicket.ticket_number} pausado.`);
+      loadQueueAndStatus();
+    } catch (err) {
+      setErrorMsg(err.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const currentCounterObj = counters.find(c => c.id === selectedCounterId);
+
+  return (
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6 font-sans">
+      
+      {/* Header Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900 border border-slate-800 p-6 rounded-3xl shadow-xl">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+            <UserCheck className="w-7 h-7" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold font-display text-white">PANEL DE ATENCIÓN EN VENTANILLA</h1>
+            <p className="text-xs text-slate-400 font-medium">
+              Funcionario: <strong className="text-slate-200">{user?.full_name}</strong> • Sede: <strong className="text-sky-400">{user?.branch_name || 'Central'}</strong>
+            </p>
+          </div>
+        </div>
+
+        {/* Counter / Consultorio Selector */}
+        <div className="flex flex-col sm:items-end gap-1.5">
+          <div className="flex items-center gap-3">
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-400">
+              Mi Módulo / Consultorio:
+            </label>
+            <select
+              value={selectedCounterId}
+              onChange={(e) => setSelectedCounterId(Number(e.target.value))}
+              className="px-4 py-2.5 rounded-2xl bg-slate-950 border border-slate-700 text-sm font-bold text-emerald-400 focus:outline-none focus:border-emerald-500 shadow-inner"
+            >
+              {counters.map(c => (
+                <option key={c.id} value={c.id}>
+                  {c.name} ({c.code})
+                </option>
+              ))}
+            </select>
+          </div>
+          {assignedServices.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5 justify-end">
+              <span className="text-[10px] text-slate-500 font-semibold">Atiende:</span>
+              {assignedServices.map((s, idx) => (
+                <span key={idx} className="px-2 py-0.5 rounded-md bg-slate-800 border border-slate-700 text-[10px] font-bold text-sky-300">
+                  {s}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Alerts */}
+      {errorMsg && (
+        <div className="p-4 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs font-semibold flex items-center gap-2">
+          <AlertCircle className="w-5 h-5 shrink-0" />
+          <span>{errorMsg}</span>
+        </div>
+      )}
+      {successMsg && (
+        <div className="p-4 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-semibold flex items-center gap-2">
+          <CheckCircle className="w-5 h-5 shrink-0 text-emerald-400" />
+          <span>{successMsg}</span>
+        </div>
+      )}
+
+      {/* Main Workspace Layout */}
+      <div className="grid grid-cols-12 gap-6">
+        
+        {/* Left Side: Current Ticket & Actions (7 Columns) */}
+        <div className="col-span-12 lg:col-span-7 space-y-6">
+          
+          {/* Tarjeta del Turno Activo */}
+          <div className="rounded-3xl bg-slate-900 border border-slate-800 p-6 sm:p-8 shadow-2xl space-y-6">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                TURNO EN ATENCIÓN
+              </span>
+              {currentTicket && (
+                <div className="flex items-center gap-2">
+                  <StatusBadge status={currentTicket.status} />
+                  <TypeBadge type={currentTicket.ticket_type} />
+                </div>
+              )}
+            </div>
+
+            {currentTicket ? (
+              <div className="space-y-6">
+                <div className="text-center py-4 bg-slate-950/80 rounded-3xl border border-slate-800/80">
+                  <div className="font-display font-black text-6xl sm:text-7xl text-white tracking-tight">
+                    {currentTicket.ticket_number}
+                  </div>
+                  <p className="mt-2 text-lg font-bold text-sky-400 uppercase">
+                    {currentTicket.service_name}
+                  </p>
+                </div>
+
+                {/* Patient Information Card */}
+                <div className="grid grid-cols-2 gap-3 p-4 rounded-2xl bg-slate-950/50 border border-slate-800 text-xs">
+                  <div>
+                    <span className="text-slate-500">Paciente:</span>
+                    <p className="font-bold text-white text-sm">{currentTicket.patient_name}</p>
+                  </div>
+                  <div>
+                    <span className="text-slate-500">Cédula:</span>
+                    <p className="font-mono font-bold text-white text-sm">{currentTicket.document_number}</p>
+                  </div>
+                  <div>
+                    <span className="text-slate-500">Edad:</span>
+                    <p className="font-semibold text-slate-200">{currentTicket.patient_age} años</p>
+                  </div>
+                  <div>
+                    <span className="text-slate-500">Llamadas realizadas:</span>
+                    <p className="font-bold text-amber-400">{currentTicket.call_count || 1} vez(es)</p>
+                  </div>
+                </div>
+
+                {/* Action Buttons Grid */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+                  <button
+                    onClick={handleRecall}
+                    disabled={actionLoading}
+                    className="p-3.5 rounded-2xl bg-sky-600/20 hover:bg-sky-600/30 border border-sky-500/40 text-sky-300 font-bold text-xs flex flex-col items-center justify-center gap-1.5 transition active:scale-95 disabled:opacity-50"
+                  >
+                    <PhoneCall className="w-5 h-5 text-sky-400" />
+                    <span>VOLVER A LLAMAR</span>
+                  </button>
+
+                  {currentTicket.status === 'LLAMADO' ? (
+                    <button
+                      onClick={handleStartAttention}
+                      disabled={actionLoading}
+                      className="p-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex flex-col items-center justify-center gap-1.5 shadow-lg shadow-emerald-600/30 transition active:scale-95 disabled:opacity-50"
+                    >
+                      <Play className="w-5 h-5" />
+                      <span>INICIAR ATENCIÓN</span>
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => setIsFinishModalOpen(true)}
+                      disabled={actionLoading}
+                      className="p-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex flex-col items-center justify-center gap-1.5 shadow-lg shadow-emerald-600/30 transition active:scale-95 disabled:opacity-50"
+                    >
+                      <CheckCircle className="w-5 h-5" />
+                      <span>FINALIZAR ATENCIÓN</span>
+                    </button>
+                  )}
+
+                  <button
+                    onClick={handleNoShow}
+                    disabled={actionLoading}
+                    className="p-3.5 rounded-2xl bg-rose-600/20 hover:bg-rose-600/30 border border-rose-500/40 text-rose-300 font-bold text-xs flex flex-col items-center justify-center gap-1.5 transition active:scale-95 disabled:opacity-50"
+                  >
+                    <UserX className="w-5 h-5 text-rose-400" />
+                    <span>NO SE PRESENTÓ</span>
+                  </button>
+
+                  <button
+                    onClick={handlePause}
+                    disabled={actionLoading}
+                    className="p-3.5 rounded-2xl bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/40 text-purple-300 font-bold text-xs flex flex-col items-center justify-center gap-1.5 transition active:scale-95 disabled:opacity-50"
+                  >
+                    <PauseCircle className="w-5 h-5 text-purple-400" />
+                    <span>PAUSAR TURNO</span>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="py-12 text-center space-y-4">
+                <div className="w-16 h-16 mx-auto rounded-full bg-slate-800 flex items-center justify-center text-slate-500">
+                  <Clock className="w-8 h-8" />
+                </div>
+                <div>
+                  <p className="text-xl font-bold text-slate-300 font-display">Módulo Libre</p>
+                  <p className="text-xs text-slate-500 mt-1">Presiona el botón a continuación para llamar al próximo turno.</p>
+                </div>
+              </div>
+            )}
+
+            {/* BOTÓN PRINCIPAL GIGANTE: LLAMAR SIGUIENTE */}
+            <div className="pt-4 border-t border-slate-800">
+              <button
+                onClick={() => handleCallNext()}
+                disabled={actionLoading || (waitingTickets.length === 0 && allBranchWaiting.length === 0)}
+                className="w-full py-5 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-sky-600 hover:from-emerald-500 hover:to-sky-500 text-white font-black text-lg font-display tracking-wide shadow-xl shadow-emerald-600/25 flex items-center justify-center gap-3 transition-all duration-200 active:scale-[0.99] disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <PhoneCall className="w-6 h-6 animate-pulse" />
+                <span>LLAMAR SIGUIENTE TURNO</span>
+              </button>
+              
+              {recommendedTicket && (
+                <div className="mt-3 p-3 rounded-xl bg-purple-500/10 border border-purple-500/20 text-center">
+                  <span className="text-xs font-semibold text-purple-300 flex items-center justify-center gap-1.5">
+                    <Sparkles className="w-4 h-4 text-purple-400" />
+                    Siguiente turno a llamar: <strong className="font-mono text-sm text-white">{recommendedTicket.ticket_number}</strong> ({recommendedTicket.ticket_type === 'PRIORITARIO' ? 'Prioritario' : 'Normal'} • {recommendedTicket.service_name})
+                  </span>
+                </div>
+              )}
+            </div>
+
+          </div>
+        </div>
+
+        {/* Right Side: Waiting Queue List (5 Columns) */}
+        <div className="col-span-12 lg:col-span-5 space-y-4">
+          <div className="rounded-3xl bg-slate-900 border border-slate-800 p-6 shadow-xl space-y-4">
+            
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <Users className="w-5 h-5 text-sky-400" />
+                <h3 className="font-bold font-display text-white text-sm">COLA DE ESPERA</h3>
+              </div>
+              <span className="px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 text-xs font-bold">
+                {queueTab === 'module' ? waitingTickets.length : totalBranchWaiting} en espera
+              </span>
+            </div>
+
+            {/* Queue Filter Tabs */}
+            <div className="grid grid-cols-2 gap-2 bg-slate-950 p-1 rounded-2xl border border-slate-800 text-xs font-bold">
+              <button
+                type="button"
+                onClick={() => setQueueTab('module')}
+                className={`py-2 rounded-xl transition ${
+                  queueTab === 'module'
+                    ? 'bg-sky-600 text-white shadow'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Mi Módulo ({waitingTickets.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setQueueTab('all')}
+                className={`py-2 rounded-xl transition ${
+                  queueTab === 'all'
+                    ? 'bg-sky-600 text-white shadow'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Toda la Sede ({totalBranchWaiting})
+              </button>
+            </div>
+
+            {/* Notice if module is empty but branch has tickets */}
+            {waitingTickets.length === 0 && totalBranchWaiting > 0 && queueTab === 'module' && (
+              <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs space-y-1">
+                <p className="font-bold">No hay turnos para tus servicios asignados.</p>
+                <p className="text-[11px] text-slate-400">
+                  Hay <strong>{totalBranchWaiting}</strong> turno(s) en espera en la sede. Puedes pulsar "Toda la Sede" arriba o pulsar "Llamar Siguiente Turno" para atenderlo.
+                </p>
+              </div>
+            )}
+
+            {/* Queue List */}
+            <div className="space-y-2 max-h-[520px] overflow-y-auto pr-1">
+              {(queueTab === 'module' ? waitingTickets : allBranchWaiting).length > 0 ? (
+                (queueTab === 'module' ? waitingTickets : allBranchWaiting).map((t) => {
+                  const isRecommended = recommendedTicket?.id === t.id;
+                  return (
+                    <div
+                      key={t.id}
+                      onClick={() => handleCallNext(t.id)}
+                      className={`p-3.5 rounded-2xl border transition-all cursor-pointer group flex items-center justify-between ${
+                        isRecommended
+                          ? 'bg-purple-950/40 border-purple-500/60 shadow-lg shadow-purple-500/10 hover:bg-purple-900/50'
+                          : 'bg-slate-950/60 border-slate-800/80 hover:border-sky-500/50 hover:bg-slate-800/50'
+                      }`}
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-black text-base text-white group-hover:text-sky-300 transition">
+                            {t.ticket_number}
+                          </span>
+                          <TypeBadge type={t.ticket_type} />
+                          {isRecommended && (
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-purple-400 bg-purple-500/20 px-2 py-0.5 rounded-md">
+                              Recomendado
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-400">{t.patient_name} • <strong className="text-sky-400">{t.service_name}</strong></p>
+                      </div>
+
+                      <div className="text-right">
+                        <button
+                          className="px-3 py-1.5 rounded-xl bg-slate-800 group-hover:bg-sky-600 text-slate-300 group-hover:text-white text-xs font-bold transition shadow"
+                        >
+                          Llamar
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="py-12 text-center text-xs text-slate-500">
+                  No hay pacientes en cola de espera en este momento.
+                </div>
+              )}
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+
+      {/* Modal para Finalizar Atención con Notas */}
+      <Modal
+        isOpen={isFinishModalOpen}
+        onClose={() => setIsFinishModalOpen(false)}
+        title={`Finalizar Atención - Turno ${currentTicket?.ticket_number}`}
+      >
+        <div className="space-y-4">
+          <p className="text-xs text-slate-400">
+            ¿Deseas agregar notas o comentarios sobre la atención médica realizada? (Opcional)
+          </p>
+
+          <textarea
+            rows="3"
+            placeholder="Observaciones de la consulta, fórmula médica, indicaciones..."
+            value={attentionNotes}
+            onChange={(e) => setAttentionNotes(e.target.value)}
+            className="w-full p-3 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500"
+          />
+
+          <div className="flex gap-3 justify-end pt-2">
+            <button
+              onClick={() => setIsFinishModalOpen(false)}
+              className="px-4 py-2 rounded-xl bg-slate-800 text-slate-400 hover:text-white text-xs font-semibold"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleCompleteTicket}
+              disabled={actionLoading}
+              className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg"
+            >
+              Confirmar Finalización
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+    </div>
+  );
+}

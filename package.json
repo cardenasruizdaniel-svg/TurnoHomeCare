@@ -1,0 +1,22 @@
+{
+  "name": "deaturnos-root",
+  "version": "1.0.0",
+  "description": "Sistema Profesional de Gestión de Turnos Inteligente con QR",
+  "private": true,
+  "scripts": {
+    "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "build": "cd backend && npm install && cd ../frontend && npm install && npm run build",
+    "start": "node backend/src/server.js",
+    "seed": "cd backend && npm run seed",
+    "test": "cd backend && npm test"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  },
+  "keywords": ["turnero", "turnos", "qr", "salud", "ips", "gestion-turnos"],
+  "author": "DEATurnos Team",
+  "license": "MIT"
+}
