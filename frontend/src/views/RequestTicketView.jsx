@@ -413,13 +413,13 @@ export function RequestTicketView() {
             </p>
 
             {/* Acciones */}
-            <div className="space-y-3">
+            <div className="space-y-3 pt-2">
               <Link
                 to={`/mi-turno/${generatedTicketData.ticket?.id}`}
-                className="w-full py-3.5 rounded-2xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs shadow-lg shadow-sky-600/30 flex items-center justify-center gap-2 transition"
+                className="w-full py-4 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-sky-600 hover:from-emerald-400 hover:to-sky-500 text-white font-black text-sm shadow-xl shadow-emerald-500/25 flex items-center justify-center gap-2 transition active:scale-95 animate-pulse"
               >
-                <span>SEGUIR TURNO EN VIVO EN ESTE CELULAR</span>
-                <ArrowRight className="w-4 h-4" />
+                <span>🔔 ACTIVAR TIMBRE Y SEGUIR EN ESTE CELULAR</span>
+                <ArrowRight className="w-5 h-5" />
               </Link>
 
               <button
