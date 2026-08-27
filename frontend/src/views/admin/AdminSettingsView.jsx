@@ -1,5 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Save, CheckCircle2, AlertCircle, Volume2, Sparkles, Building2, Palette, Globe, Wifi, Copy, Check, ExternalLink } from 'lucide-react';
+import {
+  Settings,
+  Save,
+  CheckCircle2,
+  AlertCircle,
+  Volume2,
+  Sparkles,
+  Building2,
+  Palette,
+  Globe,
+  Wifi,
+  Copy,
+  Check,
+  ExternalLink,
+  RotateCcw,
+  Image,
+  Tv,
+  Plus,
+  Trash2,
+  Megaphone
+} from 'lucide-react';
 import { api } from '../../services/api';
 import { useBranding } from '../../context/BrandingContext';
 import { LoadingSpinner } from '../../components/Modal';
@@ -31,7 +51,35 @@ export function AdminSettingsView() {
     PREVENIR_DUPLICADOS: true,
     REINICIO_DIARIO: true,
     HISTORIAL_PANTALLA_CANTIDAD: 6,
-    MENSAJE_PANTALLA: 'Por favor permanezca atento a la pantalla y cuide sus pertenencias.'
+    MENSAJE_PANTALLA: 'Por favor permanezca atento a la pantalla y cuide sus pertenencias.',
+    MARQUESINA_PANTALLA: '🌸 HomeCare del Quindío I.P.S. • Bienestar en casa • Citas médicas y atención domiciliaria • Mantenga su documento a la mano • Turnos prioritarios para adultos mayores',
+    TIEMPO_BANNER_SEGUNDOS: 7,
+    BANNERS_PUBLICIDAD: [
+      {
+        id: 'b1',
+        title: 'HomeCare del Quindío I.P.S.',
+        subtitle: 'Bienestar y atención médica con calidez humana en la comodidad de su hogar.',
+        tag: 'Bienestar en Casa',
+        imageUrl: 'https://images.unsplash.com/photo-1584515979956-d9f6e5d09982?w=800&auto=format&fit=crop&q=80',
+        isActive: true
+      },
+      {
+        id: 'b2',
+        title: 'Citas y Consultas Médicas',
+        subtitle: 'Medicina general, terapia física, nutrición y toma de muestras a domicilio.',
+        tag: 'Nuestros Servicios',
+        imageUrl: 'https://images.unsplash.com/photo-1629909613654-28e377c37b09?w=800&auto=format&fit=crop&q=80',
+        isActive: true
+      },
+      {
+        id: 'b3',
+        title: 'Atención Ágil y Sin Filas',
+        subtitle: 'Escanea el código QR con tu celular y sigue tu turno en tiempo real.',
+        tag: 'Turno Móvil',
+        imageUrl: 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=800&auto=format&fit=crop&q=80',
+        isActive: true
+      }
+    ]
   });
 
   // Company Branding State
@@ -123,6 +171,96 @@ export function AdminSettingsView() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleResetDailyQueue = async () => {
+    if (!window.confirm('¿Confirmas que deseas reiniciar el turnero de hoy? Esta acción finalizará los turnos pendientes del día y reseteará el consecutivo para que comience en 1.')) {
+      return;
+    }
+    setSaving(true);
+    setErrorMsg('');
+    try {
+      const res = await api.resetDailyQueue();
+      if (res.success) {
+        setSuccessMsg('¡Turnero reiniciado a Turno 1 con éxito!');
+        loadSettings();
+      }
+    } catch (e) {
+      setErrorMsg(e.message || 'Error al reiniciar turnero');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleAddBanner = () => {
+    const newBanner = {
+      id: 'b_' + Date.now(),
+      title: 'Nueva Promoción o Anuncio',
+      subtitle: 'Descripción breve de la campaña médica o institucional.',
+      tag: 'Novedad',
+      imageUrl: 'https://images.unsplash.com/photo-1584515979956-d9f6e5d09982?w=800&auto=format&fit=crop&q=80',
+      isActive: true
+    };
+    const currentBanners = Array.isArray(settings.BANNERS_PUBLICIDAD) ? settings.BANNERS_PUBLICIDAD : [];
+    setSettings(prev => ({
+      ...prev,
+      BANNERS_PUBLICIDAD: [...currentBanners, newBanner]
+    }));
+  };
+
+  const handleRemoveBanner = (index) => {
+    const currentBanners = Array.isArray(settings.BANNERS_PUBLICIDAD) ? [...settings.BANNERS_PUBLICIDAD] : [];
+    currentBanners.splice(index, 1);
+    setSettings(prev => ({
+      ...prev,
+      BANNERS_PUBLICIDAD: currentBanners
+    }));
+  };
+
+  const handleBannerChange = (index, field, value) => {
+    const currentBanners = Array.isArray(settings.BANNERS_PUBLICIDAD) ? [...settings.BANNERS_PUBLICIDAD] : [];
+    if (currentBanners[index]) {
+      currentBanners[index] = { ...currentBanners[index], [field]: value };
+      setSettings(prev => ({
+        ...prev,
+        BANNERS_PUBLICIDAD: currentBanners
+      }));
+    }
+  };
+
+  const handleLoadHomecareBanners = () => {
+    setSettings(prev => ({
+      ...prev,
+      MARQUESINA_PANTALLA: '🌸 HomeCare del Quindío I.P.S. • Bienestar en casa • Citas médicas y atención domiciliaria • Mantenga su documento a la mano • Turnos prioritarios para adultos mayores',
+      TIEMPO_BANNER_SEGUNDOS: 7,
+      BANNERS_PUBLICIDAD: [
+        {
+          id: 'b1',
+          title: 'HomeCare del Quindío I.P.S.',
+          subtitle: 'Bienestar y atención médica con calidez humana en la comodidad de su hogar.',
+          tag: 'Bienestar en Casa',
+          imageUrl: 'https://images.unsplash.com/photo-1584515979956-d9f6e5d09982?w=800&auto=format&fit=crop&q=80',
+          isActive: true
+        },
+        {
+          id: 'b2',
+          title: 'Citas y Consultas Médicas',
+          subtitle: 'Medicina general, terapia física y respiratoria, nutrición y toma de muestras.',
+          tag: 'Nuestros Servicios',
+          imageUrl: 'https://images.unsplash.com/photo-1629909613654-28e377c37b09?w=800&auto=format&fit=crop&q=80',
+          isActive: true
+        },
+        {
+          id: 'b3',
+          title: 'Atención Ágil y Sin Filas',
+          subtitle: 'Escanea el código QR con tu celular y sigue tu turno en tiempo real.',
+          tag: 'Turno Móvil',
+          imageUrl: 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=800&auto=format&fit=crop&q=80',
+          isActive: true
+        }
+      ]
+    }));
+    setSuccessMsg('Plantilla publicitaria de HomeCare IPS cargada.');
   };
 
   return (
@@ -323,6 +461,36 @@ export function AdminSettingsView() {
                 </div>
               </div>
 
+              {/* Control de Reinicio Diario de Turnos */}
+              <div className="space-y-2 p-4 rounded-2xl bg-slate-950/80 border border-slate-800 flex flex-col justify-between sm:col-span-2 lg:col-span-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={settings.REINICIO_DIARIO !== false}
+                        onChange={(e) => setSettings({ ...settings, REINICIO_DIARIO: e.target.checked })}
+                        className="rounded text-emerald-500 focus:ring-emerald-500 w-4 h-4"
+                      />
+                      <span className="font-bold text-white">Reinicio Diario Automático (Todos los días inicia en Turno 1)</span>
+                    </label>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      Cada día a las 00:00 medianoche la numeración de los turnos recomienza automáticamente desde el número 001.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleResetDailyQueue}
+                    disabled={saving}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 border border-rose-500/40 text-rose-300 font-bold text-xs transition active:scale-95 shrink-0 cursor-pointer"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5 text-rose-400" />
+                    <span>Reiniciar Turnero de Hoy Ahora (A Turno 1)</span>
+                  </button>
+                </div>
+              </div>
+
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs pt-2">
@@ -360,6 +528,164 @@ export function AdminSettingsView() {
                 />
               </div>
             </div>
+          </div>
+
+          {/* 1.5. SECCIÓN: Publicidad, Banners y Marquesina en Pantalla TV */}
+          <div className="p-6 rounded-3xl bg-slate-900 border border-slate-800 shadow-xl space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-pink-500/15 text-pink-400">
+                  <Tv className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold font-display text-white text-sm">Publicidad, Banners y Marquesina en Pantalla TV</h3>
+                  <p className="text-xs text-slate-400">Configura los anuncios rotativos con fotos, mensajes institucionales y la marquesina animada</p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleLoadHomecareBanners}
+                  className="px-3.5 py-1.5 rounded-xl bg-pink-600/20 hover:bg-pink-600/30 text-pink-300 border border-pink-500/40 text-xs font-bold transition cursor-pointer"
+                >
+                  🌸 Cargar Plantilla HomeCare
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAddBanner}
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold shadow-md transition cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>+ Nuevo Banner</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Configuración de Marquesina y Tiempo */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+              <div className="md:col-span-2 space-y-1.5">
+                <label className="font-bold text-slate-300 flex items-center gap-1.5">
+                  <Megaphone className="w-3.5 h-3.5 text-pink-400" />
+                  Texto de la Marquesina Inferior (Anuncios y Noticias en Pantalla)
+                </label>
+                <input
+                  type="text"
+                  value={settings.MARQUESINA_PANTALLA || ''}
+                  onChange={(e) => setSettings({ ...settings, MARQUESINA_PANTALLA: e.target.value })}
+                  placeholder="Ej: HomeCare del Quindío I.P.S. • Bienestar en casa..."
+                  className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white focus:outline-none focus:border-pink-500"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="font-bold text-slate-300">Tiempo de Rotación (Segundos por Slide)</label>
+                <input
+                  type="number"
+                  min="3"
+                  max="30"
+                  value={settings.TIEMPO_BANNER_SEGUNDOS || 7}
+                  onChange={(e) => setSettings({ ...settings, TIEMPO_BANNER_SEGUNDOS: Number(e.target.value) })}
+                  className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-700 font-bold text-teal-400 focus:outline-none focus:border-teal-500"
+                />
+              </div>
+            </div>
+
+            {/* Lista de Banners Publicitarios */}
+            <div className="space-y-3 pt-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-300 block">
+                Banners Publicitarios Activos ({Array.isArray(settings.BANNERS_PUBLICIDAD) ? settings.BANNERS_PUBLICIDAD.length : 0})
+              </span>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {(Array.isArray(settings.BANNERS_PUBLICIDAD) ? settings.BANNERS_PUBLICIDAD : []).map((b, idx) => (
+                  <div key={b.id || idx} className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3 relative group">
+                    <div className="flex items-center justify-between">
+                      <span className="px-2 py-0.5 rounded-md bg-slate-800 text-[10px] font-bold text-slate-300">
+                        Slide #{idx + 1}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <label className="flex items-center gap-1 text-[11px] text-slate-400 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={b.isActive !== false}
+                            onChange={(e) => handleBannerChange(idx, 'isActive', e.target.checked)}
+                            className="rounded text-pink-600 focus:ring-pink-500 w-3.5 h-3.5"
+                          />
+                          <span>{b.isActive !== false ? 'Activo' : 'Oculto'}</span>
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveBanner(idx)}
+                          className="p-1 rounded-lg text-slate-500 hover:text-rose-400 transition"
+                          title="Eliminar banner"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Image Preview */}
+                    <div className="h-28 rounded-xl bg-slate-900 border border-slate-800 overflow-hidden relative">
+                      {b.imageUrl ? (
+                        <img src={b.imageUrl} alt={b.title} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-slate-600 text-xs">
+                          Sin imagen
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="space-y-2 text-xs">
+                      <div>
+                        <label className="text-[10px] text-slate-500 font-bold block">Etiqueta / Badge</label>
+                        <input
+                          type="text"
+                          placeholder="Ej: Bienestar en Casa"
+                          value={b.tag || ''}
+                          onChange={(e) => handleBannerChange(idx, 'tag', e.target.value)}
+                          className="w-full p-1.5 rounded-lg bg-slate-900 border border-slate-700 text-pink-400 text-xs font-bold"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] text-slate-500 font-bold block">Título Principal</label>
+                        <input
+                          type="text"
+                          placeholder="Ej: Consulta Médica Domiciliaria"
+                          value={b.title || ''}
+                          onChange={(e) => handleBannerChange(idx, 'title', e.target.value)}
+                          className="w-full p-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs font-bold"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] text-slate-500 font-bold block">Descripción / Subtítulo</label>
+                        <textarea
+                          rows="2"
+                          placeholder="Texto descriptivo de la campaña..."
+                          value={b.subtitle || ''}
+                          onChange={(e) => handleBannerChange(idx, 'subtitle', e.target.value)}
+                          className="w-full p-1.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-300 text-xs"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] text-slate-500 font-bold block">URL de Imagen</label>
+                        <input
+                          type="text"
+                          placeholder="https://..."
+                          value={b.imageUrl || ''}
+                          onChange={(e) => handleBannerChange(idx, 'imageUrl', e.target.value)}
+                          className="w-full p-1.5 rounded-lg bg-slate-900 border border-slate-700 text-sky-400 font-mono text-[11px]"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
           </div>
 
           {/* 2. SECCIÓN: Sonido y Locución de Voz Sintetizada */}

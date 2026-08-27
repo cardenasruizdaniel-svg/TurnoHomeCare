@@ -95,20 +95,26 @@ class TicketService {
       ? (service.priority_prefix || defaultPriorityPrefix)
       : (service.letter_prefix || defaultNormalPrefix);
 
-    // 4. Calcular consecutivo del día
-    const today = new Date().toISOString().slice(0, 10);
+    // 4. Calcular consecutivo del día en hora local
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const today = `${year}-${month}-${day}`;
     
     let createdTicket = null;
 
     const transaction = db.transaction(() => {
-      // Obtener el número secuencial más alto del día para esta sede y prefijo
+      // Obtener el número secuencial más alto del día para esta sede y servicio
       const lastSequence = db.prepare(`
         SELECT MAX(sequence_number) as max_seq
         FROM tickets
-        WHERE branch_id = ? AND created_date = ? AND ticket_type = ?
-      `).get(branchId, today, ticketType);
+        WHERE branch_id = ? 
+          AND (created_date = ? OR date(created_at, 'localtime') = ?)
+          AND service_id = ?
+      `).get(branchId, today, today, service.id);
 
-      const nextSequence = (lastSequence && lastSequence.max_seq ? lastSequence.max_seq : 0) + 1;
+      const nextSequence = (lastSequence && lastSequence.max_seq ? Number(lastSequence.max_seq) : 0) + 1;
       const formattedSeq = String(nextSequence).padStart(numDigits, '0');
       const ticketNumber = `${prefix}-${formattedSeq}`;
 
@@ -755,6 +761,45 @@ class TicketService {
       ahead_count: queuePos.ahead_count,
       estimated_wait_minutes: queuePos.estimated_wait_minutes
     };
+  }
+
+  /**
+   * Reinicia la cola diaria y resetea el turnero para iniciar desde el turno 1
+   */
+  static resetDailyQueue({ branchId = 1, userId = null }) {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const today = `${year}-${month}-${day}`;
+
+    // Finalizar todos los turnos pendientes o en atención para que la cola quede en 0
+    db.prepare(`
+      UPDATE tickets 
+      SET status = 'FINALIZADO',
+          completed_at = CURRENT_TIMESTAMP,
+          notes = 'Reinicio manual de turnero diario'
+      WHERE branch_id = ? 
+        AND (created_date = ? OR date(created_at, 'localtime') = ?)
+        AND status IN ('ESPERANDO', 'LLAMADO', 'EN_ATENCION', 'PAUSADO')
+    `).run(branchId, today, today);
+
+    // Marcar los consecutivos anteriores de hoy para que la próxima secuencia comience en 1
+    db.prepare(`
+      UPDATE tickets
+      SET created_date = created_date || '-RESET'
+      WHERE branch_id = ? AND created_date = ?
+    `).run(branchId, today);
+
+    AuditService.log({
+      userId,
+      action: 'RESET_DAILY_QUEUE',
+      entity: 'TICKETS',
+      entityId: branchId,
+      details: { branchId, date: today }
+    });
+
+    return { success: true, message: 'Turnero reiniciado a 1 exitosamente.' };
   }
 }
 

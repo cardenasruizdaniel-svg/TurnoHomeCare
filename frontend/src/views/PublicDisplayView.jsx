@@ -157,13 +157,65 @@ export function PublicDisplayView() {
 
   const currentTicket = displayData?.current_ticket;
   const recentTickets = displayData?.recent_tickets || [];
-  const company = displayData?.company || { name: 'IPS Salud Integral & Vida' };
+  const company = displayData?.company || { name: 'HomeCare del Quindío I.P.S.', slogan: 'Bienestar en casa.' };
   const branch = displayData?.branch || { name: 'Sede Principal' };
   const isRealDomain = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
   const publicRequestUrl = isRealDomain
     ? `${window.location.origin}/solicitar-turno?branchId=${branchId}`
     : (displayData?.public_request_url || `${window.location.origin}/solicitar-turno?branchId=${branchId}`);
-  const bannerMessage = displayData?.settings?.MENSAJE_PANTALLA?.value || 'Por favor permanezca atento a la pantalla y cuide sus pertenencias.';
+  
+  const rawBanners = displayData?.settings?.BANNERS_PUBLICIDAD?.value;
+  const banners = React.useMemo(() => {
+    let list = [];
+    if (Array.isArray(rawBanners)) list = rawBanners;
+    else if (typeof rawBanners === 'string') {
+      try { list = JSON.parse(rawBanners); } catch { list = []; }
+    }
+    const filtered = list.filter(b => b && b.isActive !== false);
+    return filtered.length > 0 ? filtered : [
+      {
+        id: 'b1',
+        title: 'HomeCare del Quindío I.P.S.',
+        subtitle: 'Bienestar y atención médica con calidez humana en la comodidad de su hogar.',
+        tag: 'Bienestar en Casa',
+        imageUrl: 'https://images.unsplash.com/photo-1584515979956-d9f6e5d09982?w=800&auto=format&fit=crop&q=80',
+        isActive: true
+      },
+      {
+        id: 'b2',
+        title: 'Citas y Consultas Médicas',
+        subtitle: 'Medicina general, terapia física, nutrición y toma de muestras a domicilio.',
+        tag: 'Nuestros Servicios',
+        imageUrl: 'https://images.unsplash.com/photo-1629909613654-28e377c37b09?w=800&auto=format&fit=crop&q=80',
+        isActive: true
+      },
+      {
+        id: 'b3',
+        title: 'Atención Ágil y Sin Filas',
+        subtitle: 'Escanea el código QR con tu celular y sigue tu turno en tiempo real.',
+        tag: 'Turno Digital',
+        imageUrl: 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=800&auto=format&fit=crop&q=80',
+        isActive: true
+      }
+    ];
+  }, [rawBanners]);
+
+  const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
+  const slideDurationSeconds = Number(displayData?.settings?.TIEMPO_BANNER_SEGUNDOS?.value || 7);
+
+  // Rotación automática de banners publicitarios
+  useEffect(() => {
+    if (banners.length <= 1) return;
+    const interval = setInterval(() => {
+      setCurrentSlideIndex(prev => (prev + 1) % banners.length);
+    }, slideDurationSeconds * 1000);
+    return () => clearInterval(interval);
+  }, [banners.length, slideDurationSeconds]);
+
+  const currentBanner = banners[currentSlideIndex] || banners[0];
+  const marqueeText = displayData?.settings?.MARQUESINA_PANTALLA?.value 
+    || displayData?.settings?.MENSAJE_PANTALLA?.value
+    || '🌸 HomeCare del Quindío I.P.S. • Bienestar en casa • Citas médicas y atención domiciliaria • Mantenga su documento de identidad a la mano • Turnos prioritarios para adultos mayores.';
 
   return (
     <div className="fixed inset-0 bg-slate-950 text-white flex flex-col justify-between overflow-hidden select-none font-sans">
@@ -229,23 +281,24 @@ export function PublicDisplayView() {
         </div>
       </header>
 
-      {/* 2. Área Central Dividida (Izquierda: Turno Actual | Derecha: Código QR) */}
-      <main className="flex-1 grid grid-cols-12 gap-8 p-8 overflow-hidden items-center">
+      {/* 2. Cuerpo Principal: Turno Gigante (7 cols) y Banner Publicitario Multimedia (5 cols) */}
+      <main className="flex-1 p-8 grid grid-cols-12 gap-8 items-center max-h-[calc(100vh-160px)]">
         
-        {/* ÁREA IZQUIERDA: Turno Actual (7 columnas) */}
+        {/* ÁREA IZQUIERDA: Turno Activo (7 columnas) */}
         <div className="col-span-12 lg:col-span-7 h-full flex flex-col justify-center">
-          <div className={`relative rounded-3xl p-8 border transition-all duration-700 h-full flex flex-col justify-between shadow-2xl ${
-            callingAnimation 
-              ? 'bg-gradient-to-br from-sky-950/90 via-sky-900/60 to-slate-900 border-sky-400 shadow-sky-500/30 animate-pulse'
-              : 'bg-slate-900/80 border-slate-800'
+          <div className={`rounded-3xl bg-slate-900/90 border border-slate-800 p-8 h-full flex flex-col justify-between shadow-2xl transition-all duration-300 relative overflow-hidden ${
+            callingAnimation ? 'ring-4 ring-sky-500/60 shadow-sky-500/20 bg-slate-900' : ''
           }`}>
             
             {/* Header del Turno */}
             <div className="flex items-center justify-between">
-              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-400/30 text-sm font-bold uppercase tracking-wider">
-                <Sparkles className="w-4 h-4" />
-                TURNO ACTUAL EN LLAMADO
+              <div className="flex items-center gap-2">
+                <span className={`w-3.5 h-3.5 rounded-full ${callingAnimation ? 'bg-sky-400 animate-ping' : 'bg-emerald-500'}`} />
+                <span className="text-xs font-bold uppercase tracking-widest text-slate-400">
+                  {currentTicket ? 'Llamando Ahora' : 'Módulo de Atención'}
+                </span>
               </div>
+
               {currentTicket?.ticket_type === 'PRIORITARIO' && (
                 <span className="px-3.5 py-1 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40 text-xs font-bold uppercase tracking-wider animate-pulse">
                   ★ Atención Prioritaria
@@ -299,40 +352,70 @@ export function PublicDisplayView() {
           </div>
         </div>
 
-        {/* ÁREA DERECHA: Obtener Turno QR (5 columnas) */}
+        {/* ÁREA DERECHA: Banner Multimedia Rotativo & Código QR (5 columnas) */}
         <div className="col-span-12 lg:col-span-5 h-full flex flex-col justify-center">
-          <div className="rounded-3xl bg-slate-900/80 border border-slate-800 p-8 h-full flex flex-col justify-between items-center text-center shadow-2xl">
+          <div className="rounded-3xl bg-slate-900/90 border border-slate-800 p-6 h-full flex flex-col justify-between shadow-2xl relative overflow-hidden">
             
-            <div className="space-y-2">
-              <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/15 text-purple-300 border border-purple-500/30 text-xs font-bold uppercase tracking-wider">
-                Digital & Sin Filas
-              </span>
-              <h2 className="text-2xl sm:text-3xl font-black font-display text-white">OBTÉN TU TURNO</h2>
-              <p className="text-xs sm:text-sm text-slate-400 max-w-xs mx-auto">
-                Escanea el código QR con la cámara de tu celular para solicitar tu turno al instante.
-              </p>
-            </div>
+            {/* Slide Publicitario Actual */}
+            <div className="relative rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 flex-1 flex flex-col justify-end p-6 shadow-inner min-h-[260px]">
+              {/* Imagen de Fondo con Fade */}
+              {currentBanner?.imageUrl && (
+                <img
+                  src={currentBanner.imageUrl}
+                  alt={currentBanner.title}
+                  className="absolute inset-0 w-full h-full object-cover opacity-35 transition-all duration-700 hover:scale-105"
+                />
+              )}
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/75 to-slate-950/20" />
 
-            {/* Código QR Gigante y Nítido */}
-            <div className="my-auto p-5 rounded-3xl bg-white shadow-2xl shadow-purple-500/10 border-4 border-slate-800 hover:scale-105 transition-transform duration-300">
-              <QRCodeSVG
-                value={publicRequestUrl}
-                size={230}
-                level="H"
-                includeMargin={false}
-              />
-            </div>
-
-            <div className="space-y-2 max-w-xs w-full">
-              <div className="flex items-center justify-center gap-2 text-xs font-bold text-sky-400 bg-sky-500/10 py-2 px-4 rounded-xl border border-sky-500/20">
-                <span>1. Escanea</span>
-                <span>→</span>
-                <span>2. Ingresa Cédula</span>
-                <span>→</span>
-                <span>3. Tu Turno</span>
+              {/* Contenido del Banner */}
+              <div className="relative z-10 space-y-2">
+                {currentBanner?.tag && (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-pink-500/20 text-pink-300 border border-pink-500/30 text-[11px] font-bold uppercase tracking-wider">
+                    <Sparkles className="w-3 h-3" />
+                    {currentBanner.tag}
+                  </span>
+                )}
+                <h3 className="text-xl sm:text-2xl font-black font-display text-white leading-snug drop-shadow-md">
+                  {currentBanner?.title}
+                </h3>
+                <p className="text-xs text-slate-300 line-clamp-2 leading-relaxed">
+                  {currentBanner?.subtitle}
+                </p>
               </div>
-              <div className="p-2 rounded-xl bg-slate-950/80 border border-slate-800 text-[11px] text-slate-400 break-all font-mono">
-                {publicRequestUrl}
+
+              {/* Indicadores de Puntos de Navegación */}
+              {banners.length > 1 && (
+                <div className="relative z-10 flex items-center gap-1.5 mt-3">
+                  {banners.map((_, idx) => (
+                    <div
+                      key={idx}
+                      className={`h-1.5 rounded-full transition-all duration-300 ${
+                        idx === currentSlideIndex ? 'w-6 bg-pink-500' : 'w-2 bg-slate-700'
+                      }`}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Código QR Flotante para Pedir Turno */}
+            <div className="mt-4 p-4 rounded-2xl bg-slate-950/90 border border-slate-800 flex items-center justify-between gap-4">
+              <div className="space-y-1 text-left">
+                <span className="px-2 py-0.5 rounded-md bg-purple-500/20 text-purple-300 text-[10px] font-bold uppercase">
+                  Solicitud Móvil
+                </span>
+                <p className="text-sm font-extrabold text-white font-display">Escanea para tu Turno</p>
+                <p className="text-[11px] text-slate-400">Usa la cámara de tu celular con tus datos 4G/5G</p>
+              </div>
+
+              <div className="p-2 bg-white rounded-xl shadow-lg border border-slate-700 shrink-0">
+                <QRCodeSVG
+                  value={publicRequestUrl}
+                  size={76}
+                  level="M"
+                  includeMargin={false}
+                />
               </div>
             </div>
 
@@ -341,26 +424,26 @@ export function PublicDisplayView() {
 
       </main>
 
-      {/* 3. Área Inferior: Historial de Últimos Turnos Llamados */}
-      <footer className="bg-slate-900/95 border-t border-slate-800 px-8 py-4 z-20">
+      {/* 3. Área Inferior: Historial de Últimos Turnos & Marquesina Animada */}
+      <footer className="bg-slate-900/95 border-t border-slate-800 px-8 py-3 z-20 space-y-2">
         <div className="flex items-center gap-4">
-          <div className="shrink-0 flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs font-bold uppercase tracking-wider text-slate-400">
+          <div className="shrink-0 flex items-center gap-2 px-3 py-1 rounded-xl bg-slate-950 border border-slate-800 text-xs font-bold uppercase tracking-wider text-slate-400">
             <Clock className="w-4 h-4 text-sky-400" />
             ÚLTIMOS LLAMADOS:
           </div>
 
-          <div className="flex-1 flex items-center gap-3 overflow-x-auto no-scrollbar py-1">
+          <div className="flex-1 flex items-center gap-3 overflow-x-auto no-scrollbar py-0.5">
             {recentTickets.length > 0 ? (
               recentTickets.map((t, idx) => (
                 <div
                   key={t.id || idx}
-                  className="shrink-0 flex items-center gap-3 px-4 py-2 rounded-2xl bg-slate-950/80 border border-slate-800/80 text-sm shadow-md"
+                  className="shrink-0 flex items-center gap-3 px-3.5 py-1.5 rounded-xl bg-slate-950/80 border border-slate-800/80 text-xs shadow-md"
                 >
-                  <span className="font-mono font-black text-base text-white">{t.ticket_number}</span>
+                  <span className="font-mono font-black text-sm text-white">{t.ticket_number}</span>
                   <span className="text-slate-600">|</span>
-                  <span className="text-xs font-semibold text-slate-300 truncate max-w-[130px]">{t.service_name}</span>
+                  <span className="font-semibold text-slate-300 truncate max-w-[120px]">{t.service_name}</span>
                   <span className="text-slate-600">→</span>
-                  <span className="text-xs font-bold text-emerald-400 truncate max-w-[110px]">{t.counter_name}</span>
+                  <span className="font-bold text-emerald-400 truncate max-w-[100px]">{t.counter_name}</span>
                 </div>
               ))
             ) : (
@@ -369,9 +452,13 @@ export function PublicDisplayView() {
           </div>
         </div>
 
-        {/* Mensaje Institucional Inferior */}
-        <div className="mt-2 text-center text-[11px] text-slate-500 font-medium">
-          {bannerMessage}
+        {/* Marquesina Animada de Publicidad y Avisos Institucionales */}
+        <div className="overflow-hidden whitespace-nowrap bg-slate-950/70 py-1 px-4 rounded-xl border border-slate-800/60 relative">
+          <div className="inline-block animate-marquee text-xs font-medium text-slate-300">
+            <span className="mx-4">{marqueeText}</span>
+            <span className="mx-4 text-pink-400">•</span>
+            <span className="mx-4">{marqueeText}</span>
+          </div>
         </div>
       </footer>
 

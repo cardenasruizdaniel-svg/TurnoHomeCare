@@ -57,6 +57,24 @@ class SettingsController {
       res.status(400).json({ success: false, error: err.message });
     }
   }
+
+  static resetDailyQueue(req, res) {
+    try {
+      const branchId = req.body.branchId ? Number(req.body.branchId) : 1;
+      const TicketService = require('../services/ticketService');
+      const result = TicketService.resetDailyQueue({
+        branchId,
+        userId: req.user ? req.user.id : null
+      });
+
+      socketHandler.emitQueueUpdated(branchId);
+      socketHandler.emitConfigUpdated(branchId);
+
+      res.json({ success: true, message: result.message });
+    } catch (err) {
+      res.status(400).json({ success: false, error: err.message });
+    }
+  }
 }
 
 module.exports = SettingsController;

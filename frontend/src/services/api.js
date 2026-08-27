@@ -85,6 +85,7 @@ export const api = {
   // Configuración
   getSettings: () => request('/settings'),
   updateSettings: (payload) => request('/settings', { method: 'POST', body: JSON.stringify(payload) }),
+  resetDailyQueue: (branchId) => request('/settings/reset-daily-queue', { method: 'POST', body: JSON.stringify({ branchId }) }),
 
   // Túnel de Acceso Público (4G/5G)
   getTunnelStatus: () => request('/tunnel/status'),
