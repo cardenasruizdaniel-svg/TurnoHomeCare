@@ -12,7 +12,10 @@ import {
   Building2,
   Clock,
   AlertCircle,
-  FileText
+  FileText,
+  ArrowRightLeft,
+  Send,
+  Stethoscope
 } from 'lucide-react';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -25,6 +28,7 @@ export function StaffDeskView() {
   const { socket, joinBranch, connected } = useSocket();
 
   const [counters, setCounters] = useState([]);
+  const [services, setServices] = useState([]);
   const [selectedCounterId, setSelectedCounterId] = useState(() => {
     const saved = localStorage.getItem('deaturnos_staff_counter_id');
     return saved ? Number(saved) : 1;
@@ -46,9 +50,15 @@ export function StaffDeskView() {
   const [isFinishModalOpen, setIsFinishModalOpen] = useState(false);
   const [attentionNotes, setAttentionNotes] = useState('');
 
+  // Modal para Derivar / Transferir Turno a Consultorio
+  const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
+  const [targetCounterId, setTargetCounterId] = useState('');
+  const [targetServiceId, setTargetServiceId] = useState('');
+  const [transferNotes, setTransferNotes] = useState('');
+
   const branchId = user?.branch_id || 1;
 
-  // Cargar módulos/consultorios disponibles
+  // Cargar módulos y servicios disponibles
   useEffect(() => {
     api.getCounters(branchId).then(res => {
       if (res.success && res.counters) {
@@ -56,6 +66,12 @@ export function StaffDeskView() {
         if (res.counters.length > 0 && !selectedCounterId) {
           setSelectedCounterId(res.counters[0].id);
         }
+      }
+    });
+
+    api.getPublicServices().then(res => {
+      if (res.success && res.services) {
+        setServices(res.services);
       }
     });
   }, [branchId]);
@@ -237,6 +253,34 @@ export function StaffDeskView() {
     }
   };
 
+  // 7. DERIVAR / TRANSFERIR A CONSULTORIO O SERVICIO
+  const handleTransferTicket = async (e) => {
+    if (e) e.preventDefault();
+    if (!currentTicket) return;
+    setActionLoading(true);
+    try {
+      const res = await api.transferTicket(currentTicket.id, {
+        targetServiceId: targetServiceId || null,
+        targetCounterId: targetCounterId || null,
+        notes: transferNotes,
+        fromCounterId: selectedCounterId
+      });
+      if (res.success) {
+        setSuccessMsg(`Turno ${currentTicket.ticket_number} derivado exitosamente.`);
+        setCurrentTicket(null);
+        setTransferNotes('');
+        setTargetCounterId('');
+        setTargetServiceId('');
+        setIsTransferModalOpen(false);
+        loadQueueAndStatus();
+      }
+    } catch (err) {
+      setErrorMsg(err.message || 'Error al derivar turno');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const currentCounterObj = counters.find(c => c.id === selectedCounterId);
 
   return (
@@ -249,9 +293,9 @@ export function StaffDeskView() {
             <UserCheck className="w-7 h-7" />
           </div>
           <div>
-            <h1 className="text-xl font-bold font-display text-white">PANEL DE ATENCIÓN EN VENTANILLA</h1>
+            <h1 className="text-xl font-bold font-display text-white">PANEL DE ATENCIÓN EN VENTANILLA Y CONSULTORIO</h1>
             <p className="text-xs text-slate-400 font-medium">
-              Funcionario: <strong className="text-slate-200">{user?.full_name}</strong> • Sede: <strong className="text-sky-400">{user?.branch_name || 'Central'}</strong>
+              Funcionario / Médico: <strong className="text-slate-200">{user?.full_name}</strong> • Sede: <strong className="text-sky-400">{user?.branch_name || 'Central'}</strong>
             </p>
           </div>
         </div>
@@ -260,7 +304,7 @@ export function StaffDeskView() {
         <div className="flex flex-col sm:items-end gap-1.5">
           <div className="flex items-center gap-3">
             <label className="text-xs font-bold uppercase tracking-wider text-slate-400">
-              Mi Módulo / Consultorio:
+              Mi Puesto de Trabajo:
             </label>
             <select
               value={selectedCounterId}
@@ -276,7 +320,7 @@ export function StaffDeskView() {
           </div>
           {assignedServices.length > 0 && (
             <div className="flex flex-wrap items-center gap-1.5 justify-end">
-              <span className="text-[10px] text-slate-500 font-semibold">Atiende:</span>
+              <span className="text-[10px] text-slate-500 font-semibold">Servicios asignados:</span>
               {assignedServices.map((s, idx) => (
                 <span key={idx} className="px-2 py-0.5 rounded-md bg-slate-800 border border-slate-700 text-[10px] font-bold text-sky-300">
                   {s}
@@ -353,11 +397,11 @@ export function StaffDeskView() {
                 </div>
 
                 {/* Action Buttons Grid */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 pt-2">
                   <button
                     onClick={handleRecall}
                     disabled={actionLoading}
-                    className="p-3.5 rounded-2xl bg-sky-600/20 hover:bg-sky-600/30 border border-sky-500/40 text-sky-300 font-bold text-xs flex flex-col items-center justify-center gap-1.5 transition active:scale-95 disabled:opacity-50"
+                    className="p-3 rounded-2xl bg-sky-600/20 hover:bg-sky-600/30 border border-sky-500/40 text-sky-300 font-bold text-xs flex flex-col items-center justify-center gap-1.5 transition active:scale-95 disabled:opacity-50"
                   >
                     <PhoneCall className="w-5 h-5 text-sky-400" />
                     <span>VOLVER A LLAMAR</span>
@@ -367,7 +411,7 @@ export function StaffDeskView() {
                     <button
                       onClick={handleStartAttention}
                       disabled={actionLoading}
-                      className="p-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex flex-col items-center justify-center gap-1.5 shadow-lg shadow-emerald-600/30 transition active:scale-95 disabled:opacity-50"
+                      className="p-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex flex-col items-center justify-center gap-1.5 shadow-lg shadow-emerald-600/30 transition active:scale-95 disabled:opacity-50"
                     >
                       <Play className="w-5 h-5" />
                       <span>INICIAR ATENCIÓN</span>
@@ -376,17 +420,32 @@ export function StaffDeskView() {
                     <button
                       onClick={() => setIsFinishModalOpen(true)}
                       disabled={actionLoading}
-                      className="p-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex flex-col items-center justify-center gap-1.5 shadow-lg shadow-emerald-600/30 transition active:scale-95 disabled:opacity-50"
+                      className="p-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex flex-col items-center justify-center gap-1.5 shadow-lg shadow-emerald-600/30 transition active:scale-95 disabled:opacity-50"
                     >
                       <CheckCircle className="w-5 h-5" />
                       <span>FINALIZAR ATENCIÓN</span>
                     </button>
                   )}
 
+                  {/* BOTÓN DERIVAR / TRANSFERIR A CONSULTORIO */}
+                  <button
+                    onClick={() => {
+                      setTargetCounterId('');
+                      setTargetServiceId('');
+                      setTransferNotes('');
+                      setIsTransferModalOpen(true);
+                    }}
+                    disabled={actionLoading}
+                    className="p-3 rounded-2xl bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/40 text-indigo-300 font-bold text-xs flex flex-col items-center justify-center gap-1.5 transition active:scale-95 disabled:opacity-50"
+                  >
+                    <ArrowRightLeft className="w-5 h-5 text-indigo-400" />
+                    <span>TRANSFERIR A CONSULTORIO</span>
+                  </button>
+
                   <button
                     onClick={handleNoShow}
                     disabled={actionLoading}
-                    className="p-3.5 rounded-2xl bg-rose-600/20 hover:bg-rose-600/30 border border-rose-500/40 text-rose-300 font-bold text-xs flex flex-col items-center justify-center gap-1.5 transition active:scale-95 disabled:opacity-50"
+                    className="p-3 rounded-2xl bg-rose-600/20 hover:bg-rose-600/30 border border-rose-500/40 text-rose-300 font-bold text-xs flex flex-col items-center justify-center gap-1.5 transition active:scale-95 disabled:opacity-50"
                   >
                     <UserX className="w-5 h-5 text-rose-400" />
                     <span>NO SE PRESENTÓ</span>
@@ -395,7 +454,7 @@ export function StaffDeskView() {
                   <button
                     onClick={handlePause}
                     disabled={actionLoading}
-                    className="p-3.5 rounded-2xl bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/40 text-purple-300 font-bold text-xs flex flex-col items-center justify-center gap-1.5 transition active:scale-95 disabled:opacity-50"
+                    className="p-3 rounded-2xl bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/40 text-purple-300 font-bold text-xs flex flex-col items-center justify-center gap-1.5 transition active:scale-95 disabled:opacity-50"
                   >
                     <PauseCircle className="w-5 h-5 text-purple-400" />
                     <span>PAUSAR TURNO</span>
@@ -408,24 +467,41 @@ export function StaffDeskView() {
                   <Clock className="w-8 h-8" />
                 </div>
                 <div>
-                  <p className="text-xl font-bold text-slate-300 font-display">Módulo Libre</p>
-                  <p className="text-xs text-slate-500 mt-1">Presiona el botón a continuación para llamar al próximo turno.</p>
+                  <p className="text-xl font-bold text-slate-300 font-display">Puesto de Atención Libre</p>
+                  <p className="text-xs text-slate-500 mt-1">Presiona el botón a continuación para llamar al próximo paciente de tu fila.</p>
                 </div>
               </div>
             )}
 
-            {/* BOTÓN PRINCIPAL GIGANTE: LLAMAR SIGUIENTE */}
-            <div className="pt-4 border-t border-slate-800">
+            {/* BOTÓN PRINCIPAL: LLAMAR SIGUIENTE (ESTRICTAMENTE BLOQUEADO SI NO HAY TURNOS) */}
+            <div className="pt-4 border-t border-slate-800 space-y-2">
               <button
                 onClick={() => handleCallNext()}
-                disabled={actionLoading || (waitingTickets.length === 0 && allBranchWaiting.length === 0)}
-                className="w-full py-5 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-sky-600 hover:from-emerald-500 hover:to-sky-500 text-white font-black text-lg font-display tracking-wide shadow-xl shadow-emerald-600/25 flex items-center justify-center gap-3 transition-all duration-200 active:scale-[0.99] disabled:opacity-40 disabled:cursor-not-allowed"
+                disabled={actionLoading || waitingTickets.length === 0}
+                className={`w-full py-5 rounded-2xl font-black text-base sm:text-lg font-display tracking-wide shadow-xl flex items-center justify-center gap-3 transition-all duration-200 ${
+                  waitingTickets.length > 0
+                    ? 'bg-gradient-to-r from-emerald-600 via-teal-600 to-sky-600 hover:from-emerald-500 hover:to-sky-500 text-white shadow-emerald-600/25 active:scale-[0.99] cursor-pointer'
+                    : 'bg-slate-800/80 border border-slate-700/80 text-slate-500 shadow-none cursor-not-allowed opacity-50'
+                }`}
               >
-                <PhoneCall className="w-6 h-6 animate-pulse" />
-                <span>LLAMAR SIGUIENTE TURNO</span>
+                <PhoneCall className={`w-6 h-6 ${waitingTickets.length > 0 ? 'animate-pulse text-white' : 'text-slate-600'}`} />
+                <span>
+                  {waitingTickets.length > 0 
+                    ? `LLAMAR SIGUIENTE TURNO (${waitingTickets.length} EN ESPERA)` 
+                    : 'NO HAY TURNOS EN ESPERA PARA ESTE PUESTO'}
+                </span>
               </button>
               
-              {recommendedTicket && (
+              {waitingTickets.length === 0 && (
+                <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800/60 text-center">
+                  <span className="text-[11px] font-medium text-slate-400 flex items-center justify-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-slate-500" />
+                    El botón se activará automáticamente cuando un paciente solicite turno o sea derivado a este consultorio.
+                  </span>
+                </div>
+              )}
+
+              {recommendedTicket && waitingTickets.length > 0 && (
                 <div className="mt-3 p-3 rounded-xl bg-purple-500/10 border border-purple-500/20 text-center">
                   <span className="text-xs font-semibold text-purple-300 flex items-center justify-center gap-1.5">
                     <Sparkles className="w-4 h-4 text-purple-400" />
@@ -548,7 +624,7 @@ export function StaffDeskView() {
       >
         <div className="space-y-4">
           <p className="text-xs text-slate-400">
-            ¿Deseas agregar notas o comentarios sobre la atención médica realizada? (Opcional)
+            ¿Deseas agregar notas o comentarios sobre la atención realizada? (Opcional)
           </p>
 
           <textarea
@@ -575,6 +651,93 @@ export function StaffDeskView() {
             </button>
           </div>
         </div>
+      </Modal>
+
+      {/* Modal para Derivar / Transferir Turno a Consultorio */}
+      <Modal
+        isOpen={isTransferModalOpen}
+        onClose={() => setIsTransferModalOpen(false)}
+        title={`Derivar Paciente a Consultorio - Turno ${currentTicket?.ticket_number}`}
+      >
+        <form onSubmit={handleTransferTicket} className="space-y-4 text-xs">
+          <div className="p-3.5 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 space-y-1">
+            <p className="text-slate-300 font-semibold">
+              Paciente: <strong className="text-white">{currentTicket?.patient_name}</strong> (Cédula: {currentTicket?.document_number})
+            </p>
+            <p className="text-slate-400 text-[11px]">
+              El paciente conservará su número de turno <strong className="text-indigo-300 font-mono">{currentTicket?.ticket_number}</strong> y pasará directamente a la fila del consultorio o médico seleccionado.
+            </p>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="font-bold text-slate-300 block">
+              Seleccionar Consultorio / Módulo de Destino:
+            </label>
+            <select
+              value={targetCounterId}
+              onChange={(e) => setTargetCounterId(e.target.value)}
+              className="w-full p-3 rounded-xl bg-slate-950 border border-slate-700 font-bold text-white focus:outline-none focus:border-indigo-500"
+            >
+              <option value="">-- Asignación Automática por Servicio --</option>
+              {counters
+                .filter(c => c.id !== selectedCounterId)
+                .map(c => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} ({c.code})
+                  </option>
+                ))}
+            </select>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="font-bold text-slate-300 block">
+              Servicio Médico / Especialidad Requerida:
+            </label>
+            <select
+              value={targetServiceId}
+              onChange={(e) => setTargetServiceId(e.target.value)}
+              className="w-full p-3 rounded-xl bg-slate-950 border border-slate-700 font-bold text-sky-400 focus:outline-none focus:border-indigo-500"
+            >
+              <option value="">-- Conservar Servicio Actual ({currentTicket?.service_name}) --</option>
+              {services.map(s => (
+                <option key={s.id} value={s.id}>
+                  {s.name} ({s.code})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="font-bold text-slate-300 block">
+              Motivo o Indicación de la Derivación:
+            </label>
+            <textarea
+              rows="2"
+              placeholder="Ej: Orden médica autorizada, pasa a valoración con médico general..."
+              value={transferNotes}
+              onChange={(e) => setTransferNotes(e.target.value)}
+              className="w-full p-3 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500"
+            />
+          </div>
+
+          <div className="flex gap-3 justify-end pt-2 border-t border-slate-800">
+            <button
+              type="button"
+              onClick={() => setIsTransferModalOpen(false)}
+              className="px-4 py-2 rounded-xl bg-slate-800 text-slate-400 hover:text-white font-semibold"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={actionLoading}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold shadow-lg shadow-indigo-600/30 transition disabled:opacity-50"
+            >
+              <Send className="w-4 h-4" />
+              <span>Confirmar y Derivar Paciente</span>
+            </button>
+          </div>
+        </form>
       </Modal>
 
     </div>

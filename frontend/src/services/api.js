@@ -50,6 +50,7 @@ export const api = {
   recallTicket: (id) => request(`/tickets/${id}/recall`, { method: 'POST' }),
   startAttention: (id) => request(`/tickets/${id}/start-attention`, { method: 'POST' }),
   completeTicket: (id, notes) => request(`/tickets/${id}/complete`, { method: 'POST', body: JSON.stringify({ notes }) }),
+  transferTicket: (id, payload) => request(`/tickets/${id}/transfer`, { method: 'POST', body: JSON.stringify(payload) }),
   markNoShow: (id) => request(`/tickets/${id}/no-show`, { method: 'POST' }),
   pauseTicket: (id) => request(`/tickets/${id}/pause`, { method: 'POST' }),
 

@@ -13,7 +13,10 @@ export function PublicDisplayView() {
 
   const { socket, joinBranch, connected } = useSocket();
   const [displayData, setDisplayData] = useState(null);
-  const [audioEnabled, setAudioEnabled] = useState(false);
+  const [audioEnabled, setAudioEnabled] = useState(() => {
+    const saved = localStorage.getItem('deaturnos_audio_enabled');
+    return saved !== 'false'; // Por defecto activo
+  });
   const [callingAnimation, setCallingAnimation] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
 
@@ -24,6 +27,39 @@ export function PublicDisplayView() {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  // Activar audio automáticamente si ya estaba configurado
+  const enableAudio = () => {
+    SoundService.getAudioContext();
+    SoundService.playChime(0.4);
+    setAudioEnabled(true);
+    localStorage.setItem('deaturnos_audio_enabled', 'true');
+  };
+
+  const toggleAudio = (e) => {
+    if (e) e.stopPropagation();
+    if (audioEnabled) {
+      setAudioEnabled(false);
+      localStorage.setItem('deaturnos_audio_enabled', 'false');
+    } else {
+      enableAudio();
+    }
+  };
+
+  // Escuchar cualquier interacción en la pantalla para desbloquear Web Audio API
+  useEffect(() => {
+    const handleUserInteraction = () => {
+      if (audioEnabled) {
+        SoundService.getAudioContext();
+      }
+    };
+    window.addEventListener('click', handleUserInteraction, { once: true });
+    window.addEventListener('keydown', handleUserInteraction, { once: true });
+    return () => {
+      window.removeEventListener('click', handleUserInteraction);
+      window.removeEventListener('keydown', handleUserInteraction);
+    };
+  }, [audioEnabled]);
 
   // Carga inicial
   const loadDisplayData = async () => {
@@ -104,13 +140,6 @@ export function PublicDisplayView() {
     }
   }, [connected, socket, branchId, audioEnabled, displayData]);
 
-  // Habilitar audio con un toque (requerido por directiva de autoplay de navegadores)
-  const enableAudio = () => {
-    SoundService.getAudioContext();
-    SoundService.playChime(0.5);
-    setAudioEnabled(true);
-  };
-
   const currentTicket = displayData?.current_ticket;
   const recentTickets = displayData?.recent_tickets || [];
   const company = displayData?.company || { name: 'IPS Salud Integral & Vida' };
@@ -163,10 +192,14 @@ export function PublicDisplayView() {
               Click para Activar Sonido / Voz
             </button>
           ) : (
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-semibold">
+            <button
+              onClick={toggleAudio}
+              title="Click para silenciar o cambiar volumen"
+              className="flex items-center gap-2 px-3.5 py-1.5 rounded-2xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 text-xs font-semibold transition cursor-pointer"
+            >
               <Volume2 className="w-4 h-4" />
-              Voz y Sonido Activo
-            </div>
+              <span>Voz y Sonido Activo</span>
+            </button>
           )}
 
           {/* Reloj Digital */}

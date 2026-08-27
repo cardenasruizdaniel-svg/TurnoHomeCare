@@ -308,14 +308,7 @@ class TicketService {
         `).get(specificTicketId);
       } else {
         targetTicket = this.getNextRecommendedTicket(counterId, branchId);
-        // Fallback: si no hay turnos para los servicios asignados pero hay en la sede, llamar el más antiguo
-        if (!targetTicket) {
-          targetTicket = db.prepare(`
-            SELECT * FROM tickets 
-            WHERE branch_id = ? AND status = 'ESPERANDO'
-            ORDER BY created_at ASC LIMIT 1
-          `).get(branchId);
-        }
+        // Si no hay turnos para los servicios asignados a este consultorio/módulo, no roba turnos de otros módulos
       }
 
       if (!targetTicket) {
@@ -527,6 +520,90 @@ class TicketService {
     `).run(ticketId, ticket.status, userId, ticket.counter_id);
 
     return db.prepare('SELECT * FROM tickets WHERE id = ?').get(ticketId);
+  }
+
+  /**
+   * Derivar / Transferir turno de un módulo a otro consultorio o servicio
+   */
+  static transferTicket({ ticketId, targetServiceId, targetCounterId = null, notes = null, userId, fromCounterId = null }) {
+    const ticket = db.prepare(`
+      SELECT t.*, s.name as current_service_name, p.full_name as patient_name
+      FROM tickets t
+      JOIN services s ON t.service_id = s.id
+      JOIN patients p ON t.patient_id = p.id
+      WHERE t.id = ?
+    `).get(ticketId);
+
+    if (!ticket) throw new Error('TURNO_NO_ENCONTRADO');
+
+    const targetService = targetServiceId 
+      ? db.prepare('SELECT * FROM services WHERE id = ?').get(targetServiceId)
+      : db.prepare('SELECT * FROM services WHERE id = ?').get(ticket.service_id);
+
+    const fromCounter = fromCounterId 
+      ? db.prepare('SELECT * FROM counters WHERE id = ?').get(fromCounterId)
+      : null;
+
+    const toCounter = targetCounterId 
+      ? db.prepare('SELECT * FROM counters WHERE id = ?').get(targetCounterId)
+      : null;
+
+    const transferNote = `[Derivado de ${fromCounter ? fromCounter.name : 'Ventanilla'} -> ${toCounter ? toCounter.name : (targetService ? targetService.name : 'Consultorio')}] ${notes || ''}`.trim();
+
+    const updatedNotes = ticket.notes ? `${ticket.notes}\n${transferNote}` : transferNote;
+
+    // Actualizar turno: pasa a 'ESPERANDO' con el nuevo servicio y/o consultorio asignado
+    db.prepare(`
+      UPDATE tickets
+      SET status = 'ESPERANDO',
+          service_id = ?,
+          counter_id = ?,
+          notes = ?,
+          called_at = NULL,
+          attended_at = NULL
+      WHERE id = ?
+    `).run(targetService ? targetService.id : ticket.service_id, targetCounterId || null, updatedNotes, ticketId);
+
+    // Registrar evento de derivación
+    db.prepare(`
+      INSERT INTO ticket_events (ticket_id, from_status, to_status, user_id, counter_id, metadata)
+      VALUES (?, ?, 'ESPERANDO', ?, ?, ?)
+    `).run(
+      ticketId,
+      ticket.status,
+      userId,
+      fromCounterId || ticket.counter_id,
+      JSON.stringify({
+        action: 'TRANSFER_TICKET',
+        from_counter: fromCounter ? fromCounter.name : null,
+        to_service: targetService ? targetService.name : null,
+        to_counter: toCounter ? toCounter.name : null,
+        notes
+      })
+    );
+
+    AuditService.log({
+      userId,
+      action: 'TRANSFER_TICKET',
+      entity: 'TICKET',
+      entityId: ticket.id,
+      details: {
+        ticket_number: ticket.ticket_number,
+        from_counter: fromCounter ? fromCounter.name : null,
+        to_service: targetService ? targetService.name : null,
+        to_counter: toCounter ? toCounter.name : null,
+        notes
+      }
+    });
+
+    return db.prepare(`
+      SELECT t.*, s.name as service_name, s.code as service_code,
+             p.full_name as patient_name, p.document_number, p.age as patient_age
+      FROM tickets t
+      JOIN services s ON t.service_id = s.id
+      JOIN patients p ON t.patient_id = p.id
+      WHERE t.id = ?
+    `).get(ticketId);
   }
 
   /**

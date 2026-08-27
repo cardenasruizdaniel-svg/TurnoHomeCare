@@ -240,6 +240,38 @@ class TicketController {
   }
 
   /**
+   * Derivar / Transferir turno a consultorio u otro servicio
+   */
+  static transfer(req, res) {
+    try {
+      const ticketId = Number(req.params.id);
+      const { targetServiceId, targetCounterId, notes, fromCounterId } = req.body;
+      const userId = req.user.id;
+
+      const ticket = TicketService.transferTicket({
+        ticketId,
+        targetServiceId: targetServiceId ? Number(targetServiceId) : null,
+        targetCounterId: targetCounterId ? Number(targetCounterId) : null,
+        notes,
+        userId,
+        fromCounterId: fromCounterId ? Number(fromCounterId) : null
+      });
+
+      socketHandler.emitTicketStatusChanged(ticket.branch_id, ticket);
+      socketHandler.emitQueueUpdated(ticket.branch_id);
+
+      res.json({
+        success: true,
+        message: 'Turno derivado exitosamente',
+        ticket
+      });
+    } catch (err) {
+      console.error('Error al transferir turno:', err);
+      res.status(400).json({ success: false, error: err.message });
+    }
+  }
+
+  /**
    * Pausar turno
    */
   static pause(req, res) {

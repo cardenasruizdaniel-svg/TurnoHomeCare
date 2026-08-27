@@ -49,6 +49,7 @@ router.post('/tickets/call-next', authenticateToken, TicketController.callNext);
 router.post('/tickets/:id/recall', authenticateToken, TicketController.recall);
 router.post('/tickets/:id/start-attention', authenticateToken, TicketController.startAttention);
 router.post('/tickets/:id/complete', authenticateToken, TicketController.complete);
+router.post('/tickets/:id/transfer', authenticateToken, TicketController.transfer);
 router.post('/tickets/:id/no-show', authenticateToken, TicketController.markNoShow);
 router.post('/tickets/:id/pause', authenticateToken, TicketController.pause);
 
