@@ -72,22 +72,22 @@ class SettingsService {
    * Actualiza múltiples configuraciones en lote
    */
   static updateBatch(settingsMap, branchId = null) {
-    const updateStmt = db.prepare(`
-      INSERT INTO settings (branch_id, key, value, description, data_type)
-      VALUES (?, ?, ?, ?, ?)
-      ON CONFLICT(branch_id, key) DO UPDATE SET
-        value = excluded.value,
-        updated_at = CURRENT_TIMESTAMP
-    `);
-
     const transaction = db.transaction((items) => {
       for (const [key, val] of Object.entries(items)) {
         const strVal = typeof val === 'object' ? JSON.stringify(val) : String(val);
-        // Buscar metadata existente
-        const meta = db.prepare('SELECT description, data_type FROM settings WHERE key = ? LIMIT 1').get(key);
-        const desc = meta ? meta.description : '';
-        const dtype = meta ? meta.data_type : (typeof val === 'number' ? 'number' : typeof val === 'boolean' ? 'boolean' : 'string');
-        updateStmt.run(branchId, key, strVal, desc, dtype);
+        const dtype = typeof val === 'object' ? 'json' : (typeof val === 'number' ? 'number' : typeof val === 'boolean' ? 'boolean' : 'string');
+
+        const existing = branchId
+          ? db.prepare('SELECT id FROM settings WHERE key = ? AND branch_id = ?').get(key, branchId)
+          : db.prepare('SELECT id FROM settings WHERE key = ? AND branch_id IS NULL').get(key);
+
+        if (existing) {
+          db.prepare('UPDATE settings SET value = ?, data_type = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+            .run(strVal, dtype, existing.id);
+        } else {
+          db.prepare('INSERT INTO settings (branch_id, key, value, description, data_type) VALUES (?, ?, ?, ?, ?)')
+            .run(branchId, key, strVal, '', dtype);
+        }
       }
     });
 
@@ -96,20 +96,16 @@ class SettingsService {
 
   static castValue(val, type) {
     if (val === null || val === undefined) return null;
-    switch (type) {
-      case 'number':
-        return Number(val);
-      case 'boolean':
-        return val === 'true' || val === '1' || val === 1 || val === true;
-      case 'json':
-        try {
-          return JSON.parse(val);
-        } catch {
-          return val;
-        }
-      default:
-        return String(val);
+    if (type === 'number') return Number(val);
+    if (type === 'boolean') return val === 'true' || val === '1' || val === 1 || val === true;
+    if (type === 'json' || (typeof val === 'string' && (val.trim().startsWith('[') || val.trim().startsWith('{')))) {
+      try {
+        return JSON.parse(val);
+      } catch {
+        return val;
+      }
     }
+    return String(val);
   }
 }
 

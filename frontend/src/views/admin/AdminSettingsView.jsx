@@ -104,7 +104,11 @@ export function AdminSettingsView() {
         if (res.settings) {
           const map = {};
           Object.keys(res.settings).forEach(k => {
-            map[k] = res.settings[k].value;
+            let val = res.settings[k].value;
+            if (k === 'BANNERS_PUBLICIDAD' && typeof val === 'string') {
+              try { val = JSON.parse(val); } catch {}
+            }
+            map[k] = val;
           });
           setSettings(prev => ({ ...prev, ...map }));
         }
@@ -161,14 +165,19 @@ export function AdminSettingsView() {
     setSuccessMsg('');
 
     try {
-      await api.updateSettings({
+      const res = await api.updateSettings({
         settings,
         company
       });
-      setSuccessMsg('Configuraciones guardadas y sincronizadas exitosamente.');
-      refreshBranding();
+      if (res && res.success !== false) {
+        setSuccessMsg('¡Configuraciones y banners guardados y sincronizados exitosamente!');
+        refreshBranding();
+        await loadSettings();
+      } else {
+        setErrorMsg(res?.error || 'Error al guardar configuraciones');
+      }
     } catch (err) {
-      setErrorMsg(err.message);
+      setErrorMsg(err.message || 'Error al guardar');
     } finally {
       setSaving(false);
     }
