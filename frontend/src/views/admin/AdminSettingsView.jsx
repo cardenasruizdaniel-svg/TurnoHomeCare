@@ -101,15 +101,22 @@ export function AdminSettingsView() {
     try {
       const res = await api.getSettings();
       if (res && res.success) {
-        if (res.company) setCompany(res.company);
-        if (res.settings) {
+        if (res.company && typeof res.company === 'object') {
+          setCompany(prev => ({ ...prev, ...res.company }));
+        }
+        if (res.settings && typeof res.settings === 'object') {
           const map = {};
           Object.keys(res.settings).forEach(k => {
-            let val = res.settings[k].value;
-            if (k === 'BANNERS_PUBLICIDAD' && typeof val === 'string') {
-              try { val = JSON.parse(val); } catch {}
+            let val = res.settings[k]?.value;
+            if (k === 'BANNERS_PUBLICIDAD') {
+              if (typeof val === 'string') {
+                try { val = JSON.parse(val); } catch { val = []; }
+              }
+              if (!Array.isArray(val)) val = [];
             }
-            map[k] = val;
+            if (val !== undefined && val !== null) {
+              map[k] = val;
+            }
           });
           setSettings(prev => ({ ...prev, ...map }));
         }

@@ -65,6 +65,7 @@ export function App() {
             <Route path="sedes" element={<AdminBranchesView />} />
             <Route path="usuarios" element={<AdminUsersView />} />
             <Route path="configuracion" element={<AdminSettingsView />} />
+            <Route path="settings" element={<AdminSettingsView />} />
             <Route path="reportes" element={<AdminReportsView />} />
             <Route path="auditoria" element={<AdminAuditView />} />
           </Route>
