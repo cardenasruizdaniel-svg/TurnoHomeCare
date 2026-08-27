@@ -199,7 +199,23 @@ class TicketService {
    * Algoritmo inteligente de prioridad (2 normales x 1 prioritario configurable con fallback anti-bloqueo)
    */
   static getNextRecommendedTicket(counterId, branchId) {
-    // 1. Obtener servicios asignados a este módulo
+    // 1. Primero: Buscar si hay algún turno derivado o asignado ESPECÍFICAMENTE a este módulo/consultorio
+    const directAssigned = db.prepare(`
+      SELECT t.*, s.name as service_name, p.full_name as patient_name, p.age as patient_age
+      FROM tickets t
+      JOIN services s ON t.service_id = s.id
+      JOIN patients p ON t.patient_id = p.id
+      WHERE t.branch_id = ?
+        AND t.status = 'ESPERANDO'
+        AND t.counter_id = ?
+      ORDER BY t.created_at ASC LIMIT 1
+    `).get(branchId, counterId);
+
+    if (directAssigned) {
+      return directAssigned;
+    }
+
+    // 2. Obtener servicios asignados a este módulo
     const assignedServices = db.prepare(`
       SELECT service_id FROM counter_services WHERE counter_id = ?
     `).all(counterId).map(s => s.service_id);
@@ -212,7 +228,7 @@ class TicketService {
 
     const placeholders = assignedServices.map(() => '?').join(',');
 
-    // 2. Obtener turnos en espera para esos servicios
+    // 3. Obtener turnos generales en espera (que no estén bloqueados/asignados a otro consultorio específico)
     const waitingTickets = db.prepare(`
       SELECT t.*, s.name as service_name, p.full_name as patient_name, p.age as patient_age
       FROM tickets t
@@ -220,12 +236,13 @@ class TicketService {
       JOIN patients p ON t.patient_id = p.id
       WHERE t.branch_id = ?
         AND t.status = 'ESPERANDO'
+        AND (t.counter_id IS NULL OR t.counter_id = ?)
         AND t.service_id IN (${placeholders})
       ORDER BY t.created_at ASC
-    `).all(branchId, ...assignedServices);
+    `).all(branchId, counterId, ...assignedServices);
 
     if (waitingTickets.length === 0) {
-      // Fallback: Si no hay turnos para los servicios asignados, buscar en todos los turnos en espera de la sede
+      // Fallback: Si no hay turnos para los servicios asignados, buscar en todos los turnos generales de la sede
       const fallbackTickets = db.prepare(`
         SELECT t.*, s.name as service_name, p.full_name as patient_name, p.age as patient_age
         FROM tickets t
@@ -233,8 +250,9 @@ class TicketService {
         JOIN patients p ON t.patient_id = p.id
         WHERE t.branch_id = ?
           AND t.status = 'ESPERANDO'
+          AND (t.counter_id IS NULL OR t.counter_id = ?)
         ORDER BY t.created_at ASC
-      `).all(branchId);
+      `).all(branchId, counterId);
 
       if (fallbackTickets.length === 0) {
         return null;
@@ -249,7 +267,7 @@ class TicketService {
     if (priorityTickets.length === 0) return normalTickets[0];
     if (normalTickets.length === 0) return priorityTickets[0];
 
-    // 3. Evaluar la proporción de atención histórica del día (Ratio de Prioridad)
+    // 4. Evaluar la proporción de atención histórica del día (Ratio de Prioridad)
     const ratioPriority = SettingsService.get('RATIO_PRIORIDAD', branchId) || 2;
     const today = new Date().toISOString().slice(0, 10);
 
@@ -556,23 +574,37 @@ class TicketService {
 
     if (!ticket) throw new Error('TURNO_NO_ENCONTRADO');
 
-    const targetService = targetServiceId 
-      ? db.prepare('SELECT * FROM services WHERE id = ?').get(targetServiceId)
-      : db.prepare('SELECT * FROM services WHERE id = ?').get(ticket.service_id);
+    let finalServiceId = targetServiceId ? Number(targetServiceId) : null;
+    const finalCounterId = targetCounterId ? Number(targetCounterId) : null;
+
+    if (!finalServiceId && finalCounterId) {
+      const primaryCounterService = db.prepare(`
+        SELECT service_id FROM counter_services WHERE counter_id = ? LIMIT 1
+      `).get(finalCounterId);
+      if (primaryCounterService) {
+        finalServiceId = primaryCounterService.service_id;
+      }
+    }
+
+    if (!finalServiceId) {
+      finalServiceId = ticket.service_id;
+    }
 
     const fromCounter = fromCounterId 
       ? db.prepare('SELECT * FROM counters WHERE id = ?').get(fromCounterId)
+      : (ticket.counter_id ? db.prepare('SELECT * FROM counters WHERE id = ?').get(ticket.counter_id) : null);
+
+    const toCounter = finalCounterId 
+      ? db.prepare('SELECT * FROM counters WHERE id = ?').get(finalCounterId)
       : null;
 
-    const toCounter = targetCounterId 
-      ? db.prepare('SELECT * FROM counters WHERE id = ?').get(targetCounterId)
-      : null;
+    const targetService = db.prepare('SELECT * FROM services WHERE id = ?').get(finalServiceId);
 
-    const transferNote = `[Derivado de ${fromCounter ? fromCounter.name : 'Ventanilla'} -> ${toCounter ? toCounter.name : (targetService ? targetService.name : 'Consultorio')}] ${notes || ''}`.trim();
+    const transferNote = `[Derivado de ${fromCounter ? fromCounter.name : 'Ventanilla'} ➔ ${toCounter ? toCounter.name : (targetService ? targetService.name : 'Consultorio')}] ${notes || ''}`.trim();
 
     const updatedNotes = ticket.notes ? `${ticket.notes}\n${transferNote}` : transferNote;
 
-    // Actualizar turno: pasa a 'ESPERANDO' con el nuevo servicio y/o consultorio asignado
+    // Actualizar turno: pasa a 'ESPERANDO' y asignado al nuevo consultorio
     db.prepare(`
       UPDATE tickets
       SET status = 'ESPERANDO',
@@ -582,7 +614,7 @@ class TicketService {
           called_at = NULL,
           attended_at = NULL
       WHERE id = ?
-    `).run(targetService ? targetService.id : ticket.service_id, targetCounterId || null, updatedNotes, ticketId);
+    `).run(finalServiceId, finalCounterId, updatedNotes, ticketId);
 
     // Registrar evento de derivación
     db.prepare(`
@@ -679,7 +711,7 @@ class TicketService {
    * Obtiene la cola de espera activa para la sede o módulo
    */
   static getWaitingQueue(branchId = 1, counterId = null) {
-    let serviceFilter = '';
+    let counterFilter = '';
     const params = [branchId];
     let assignedServiceNames = [];
 
@@ -695,8 +727,11 @@ class TicketService {
 
       if (assigned.length > 0) {
         const placeholders = assigned.map(() => '?').join(',');
-        serviceFilter = `AND t.service_id IN (${placeholders})`;
-        params.push(...assigned.map(a => a.service_id));
+        counterFilter = `AND (t.counter_id = ? OR (t.counter_id IS NULL AND t.service_id IN (${placeholders})))`;
+        params.push(counterId, ...assigned.map(a => a.service_id));
+      } else {
+        counterFilter = `AND (t.counter_id = ? OR t.counter_id IS NULL)`;
+        params.push(counterId);
       }
     }
 
@@ -709,7 +744,7 @@ class TicketService {
       JOIN patients p ON t.patient_id = p.id
       WHERE t.branch_id = ?
         AND t.status = 'ESPERANDO'
-        ${serviceFilter}
+        ${counterFilter}
       ORDER BY t.created_at ASC
     `).all(...params);
 

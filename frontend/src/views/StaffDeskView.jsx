@@ -137,12 +137,14 @@ export function StaffDeskView() {
       socket.on('ticket:called', handleUpdate);
       socket.on('ticket:recalled', handleUpdate);
       socket.on('ticket:status_changed', handleUpdate);
+      socket.on('queue:updated', handleUpdate);
 
       return () => {
         socket.off('ticket:created', handleUpdate);
         socket.off('ticket:called', handleUpdate);
         socket.off('ticket:recalled', handleUpdate);
         socket.off('ticket:status_changed', handleUpdate);
+        socket.off('queue:updated', handleUpdate);
       };
     }
   }, [connected, socket, branchId, selectedCounterId]);
