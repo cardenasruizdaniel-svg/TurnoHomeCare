@@ -15,7 +15,8 @@ import {
   FileText,
   ArrowRightLeft,
   Send,
-  Stethoscope
+  Stethoscope,
+  Printer
 } from 'lucide-react';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -362,6 +363,131 @@ export function StaffDeskView() {
     } finally {
       setActionLoading(false);
     }
+  };
+
+  const handlePrintTicket = (ticket) => {
+    if (!ticket) return;
+    const printWindow = window.open('', '_blank', 'width=380,height=520');
+    if (!printWindow) {
+      window.print();
+      return;
+    }
+    const isPriority = ticket.ticket_type === 'PRIORITARIO' || ticket.ticket_type === 'ESPECIAL';
+    const dateStr = new Date().toLocaleString('es-CO', {
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', hour12: true
+    });
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <title>Turno ${ticket.ticket_number}</title>
+          <style>
+            @page {
+              size: 80mm auto;
+              margin: 4mm;
+            }
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+              width: 70mm;
+              margin: 0 auto;
+              padding: 6px;
+              text-align: center;
+              color: #000;
+            }
+            .header {
+              border-bottom: 2px dashed #000;
+              padding-bottom: 8px;
+              margin-bottom: 8px;
+            }
+            .title {
+              font-size: 15px;
+              font-weight: 900;
+              text-transform: uppercase;
+            }
+            .subtitle {
+              font-size: 10px;
+              margin-top: 2px;
+            }
+            .ticket-box {
+              padding: 10px 0;
+            }
+            .badge {
+              display: inline-block;
+              font-size: 10px;
+              font-weight: 900;
+              border: 1.5px solid #000;
+              padding: 2px 8px;
+              border-radius: 4px;
+              text-transform: uppercase;
+              margin-bottom: 6px;
+            }
+            .ticket-number {
+              font-size: 48px;
+              font-weight: 900;
+              line-height: 1;
+              margin: 4px 0;
+            }
+            .service {
+              font-size: 13px;
+              font-weight: bold;
+              text-transform: uppercase;
+              margin-top: 4px;
+            }
+            .patient-info {
+              border-top: 1px dashed #000;
+              border-bottom: 1px dashed #000;
+              padding: 6px 0;
+              margin: 8px 0;
+              font-size: 11px;
+              text-align: left;
+            }
+            .patient-info p {
+              margin: 2px 0;
+            }
+            .footer {
+              font-size: 10px;
+              margin-top: 8px;
+              line-height: 1.3;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="title">HomeCare del Quindío</div>
+            <div class="subtitle">I.P.S. • Sistema de Turnos</div>
+            <div class="subtitle" style="margin-top: 3px;">${dateStr}</div>
+          </div>
+          
+          <div class="ticket-box">
+            ${isPriority ? '<div class="badge">★ ATENCIÓN PRIORITARIA ★</div>' : '<div class="badge">TURNO GENERAL</div>'}
+            <div class="ticket-number">${ticket.ticket_number}</div>
+            <div class="service">${ticket.service_name || ''}</div>
+          </div>
+
+          <div class="patient-info">
+            <p><strong>Paciente:</strong> ${ticket.patient_name || ''}</p>
+            <p><strong>Documento:</strong> ${ticket.document_number || ''}</p>
+            ${ticket.patient_age ? `<p><strong>Edad:</strong> ${ticket.patient_age} años</p>` : ''}
+          </div>
+
+          <div class="footer">
+            <p><strong>Por favor permanezca atento a la pantalla y al altavoz.</strong></p>
+            <p style="margin-top: 4px;">¡Gracias por su visita!</p>
+          </div>
+          <script>
+            window.onload = function() {
+              window.focus();
+              window.print();
+              setTimeout(function() { window.close(); }, 1000);
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
   };
 
   const currentCounterObj = counters.find(c => c.id === selectedCounterId);
@@ -915,15 +1041,14 @@ export function StaffDeskView() {
               </div>
             </div>
 
-            <div className="flex gap-3 justify-center">
+            <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
               <button
                 type="button"
-                onClick={() => {
-                  window.print();
-                }}
-                className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition"
+                onClick={() => handlePrintTicket(createdManualTicket)}
+                className="flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-600/30 transition cursor-pointer"
               >
-                Imprimir Comprobante
+                <Printer className="w-4 h-4" />
+                <span>🖨️ Imprimir Tiquete Físico</span>
               </button>
               <button
                 type="button"
@@ -931,9 +1056,9 @@ export function StaffDeskView() {
                   setCreatedManualTicket(null);
                   setIsManualModalOpen(false);
                 }}
-                className="px-6 py-2.5 rounded-xl bg-pink-600 hover:bg-pink-500 text-white text-xs font-bold shadow-lg shadow-pink-600/30 transition"
+                className="px-6 py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold transition cursor-pointer"
               >
-                Listo / Cerrar
+                ✅ Continuar sin Imprimir
               </button>
             </div>
           </div>
