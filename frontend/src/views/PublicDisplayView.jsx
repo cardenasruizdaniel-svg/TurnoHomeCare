@@ -383,82 +383,90 @@ export function PublicDisplayView() {
           </div>
         </div>
 
-        {/* ÁREA DERECHA: Banner Multimedia Rotativo & Código QR (5 columnas) */}
-        <div className="col-span-12 lg:col-span-5 h-full flex flex-col justify-center">
-          <div className="rounded-3xl bg-slate-900/90 border border-slate-800 p-5 h-full flex flex-col justify-between shadow-2xl relative overflow-hidden">
-            
-            {/* Banner Card con Imagen Clara y Visible */}
-            <div className="rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 flex-1 flex flex-col justify-between shadow-inner">
-              
-              {/* Imagen del Banner (Alta Definición) */}
-              <div className="relative h-44 sm:h-52 w-full bg-slate-900 overflow-hidden shrink-0">
-                {currentBanner?.imageUrl ? (
-                  <img
-                    src={currentBanner.imageUrl}
-                    alt={currentBanner.title}
-                    className="w-full h-full object-cover transition-transform duration-700 hover:scale-105"
-                  />
-                ) : (
-                  <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-tr from-pink-900/40 via-purple-900/30 to-teal-900/40 p-4 text-center">
-                    <Sparkles className="w-10 h-10 text-pink-400 mb-2 animate-pulse" />
-                    <span className="font-bold text-white text-sm">HomeCare del Quindío I.P.S.</span>
-                  </div>
-                )}
-
-                {/* Badge Flotante en la Esquina Superior */}
-                {currentBanner?.tag && (
-                  <div className="absolute top-3 left-3 z-10">
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-pink-600/90 backdrop-blur-md text-white border border-pink-400/40 text-xs font-black uppercase tracking-wider shadow-lg">
-                      <Sparkles className="w-3.5 h-3.5" />
-                      {currentBanner.tag}
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              {/* Textos del Banner */}
-              <div className="p-4 space-y-1.5 flex-1 flex flex-col justify-center bg-gradient-to-b from-slate-950/90 to-slate-900">
-                <h3 className="text-lg sm:text-xl font-black font-display text-white leading-tight">
-                  {currentBanner?.title}
-                </h3>
-                <p className="text-xs text-slate-300 leading-relaxed line-clamp-2">
-                  {currentBanner?.subtitle}
-                </p>
-
-                {/* Indicadores de Puntos de Navegación */}
-                {banners.length > 1 && (
-                  <div className="flex items-center gap-1.5 pt-2">
-                    {banners.map((_, idx) => (
-                      <div
-                        key={idx}
-                        className={`h-1.5 rounded-full transition-all duration-300 ${
-                          idx === currentSlideIndex ? 'w-6 bg-pink-500' : 'w-2 bg-slate-700'
-                        }`}
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-
+        {/* ÁREA DERECHA: Banner Multimedia Rotativo & Código QR Gigante (5 columnas) */}
+        <div className="col-span-12 lg:col-span-5 h-full flex flex-col justify-between gap-3">
+          
+          {/* 1. Tarjeta Superior: Carrusel Publicitario Multimedia HomeCare IPS */}
+          <div className="rounded-3xl bg-slate-900/90 border border-slate-800 p-4 shadow-xl flex items-center gap-4 relative overflow-hidden shrink-0">
+            {/* Imagen / Miniatura Destacada */}
+            <div className="w-28 h-24 sm:w-32 sm:h-28 rounded-2xl bg-slate-950 overflow-hidden shrink-0 relative border border-slate-800 shadow-md">
+              {currentBanner?.imageUrl ? (
+                <img
+                  src={currentBanner.imageUrl}
+                  alt={currentBanner.title}
+                  className="w-full h-full object-cover transition-transform duration-700 hover:scale-105"
+                />
+              ) : (
+                <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-tr from-pink-900/40 via-purple-900/30 to-teal-900/40 p-2 text-center">
+                  <Sparkles className="w-7 h-7 text-pink-400 mb-1 animate-pulse" />
+                  <span className="font-bold text-white text-[10px]">HomeCare IPS</span>
+                </div>
+              )}
             </div>
 
-            {/* Código QR Flotante para Pedir Turno */}
-            <div className="mt-3 p-3.5 rounded-2xl bg-slate-950/90 border border-slate-800 flex items-center justify-between gap-4 shrink-0">
-              <div className="space-y-0.5 text-left">
-                <span className="px-2 py-0.5 rounded-md bg-purple-500/20 text-purple-300 text-[10px] font-bold uppercase">
-                  Solicitud Móvil
+            {/* Textos del Banner */}
+            <div className="flex-1 min-w-0 space-y-1">
+              {currentBanner?.tag && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-pink-600/20 text-pink-300 border border-pink-500/30 text-[10px] font-black uppercase tracking-wider">
+                  <Sparkles className="w-3 h-3 text-pink-400" />
+                  {currentBanner.tag}
                 </span>
-                <p className="text-sm font-extrabold text-white font-display">Escanea para tu Turno</p>
-                <p className="text-[11px] text-slate-400">Usa la cámara de tu celular con tus datos 4G/5G</p>
-              </div>
+              )}
+              <h3 className="text-sm sm:text-base font-black font-display text-white leading-tight truncate">
+                {currentBanner?.title}
+              </h3>
+              <p className="text-xs text-slate-300 line-clamp-2 leading-snug">
+                {currentBanner?.subtitle}
+              </p>
 
-              <div className="p-2 bg-white rounded-xl shadow-lg border border-slate-700 shrink-0">
-                <QRCodeSVG
-                  value={publicRequestUrl}
-                  size={68}
-                  level="M"
-                  includeMargin={false}
-                />
+              {/* Indicadores de Puntos de Navegación */}
+              {banners.length > 1 && (
+                <div className="flex items-center gap-1 pt-1">
+                  {banners.map((_, idx) => (
+                    <div
+                      key={idx}
+                      className={`h-1.5 rounded-full transition-all duration-300 ${
+                        idx === currentSlideIndex ? 'w-5 bg-pink-500' : 'w-1.5 bg-slate-700'
+                      }`}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* 2. Tarjeta Central-Inferior: Código QR Gigante para Celular */}
+          <div className="rounded-3xl bg-slate-900/95 border-2 border-purple-500/30 p-5 shadow-2xl flex-1 flex flex-col justify-between items-center text-center relative overflow-hidden">
+            
+            {/* Encabezado QR */}
+            <div className="space-y-1">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-purple-500/20 via-pink-500/15 to-teal-500/20 text-purple-200 border border-purple-500/30 text-xs font-black uppercase tracking-wider">
+                📱 SOLICITUD MÓVIL (4G / 5G / Wi-Fi)
+              </span>
+              <h2 className="text-xl sm:text-2xl font-black font-display text-white tracking-tight">OBTÉN TU TURNO AQUÍ</h2>
+              <p className="text-xs text-slate-300 max-w-xs mx-auto">
+                Apunta con la cámara de tu celular para solicitar tu turno digital sin filas
+              </p>
+            </div>
+
+            {/* Código QR Gigante y Nítido */}
+            <div className="my-auto p-4 rounded-3xl bg-white shadow-2xl shadow-purple-500/20 border-4 border-slate-800 hover:scale-105 transition-transform duration-300 flex items-center justify-center">
+              <QRCodeSVG
+                value={publicRequestUrl}
+                size={175}
+                level="H"
+                includeMargin={false}
+              />
+            </div>
+
+            {/* Instrucciones Rápidas */}
+            <div className="w-full space-y-1">
+              <div className="flex items-center justify-center gap-2 text-xs font-bold text-teal-300 bg-teal-500/10 py-1.5 px-3 rounded-xl border border-teal-500/20">
+                <span>1. Escanea QR</span>
+                <span>➔</span>
+                <span>2. Digita Cédula</span>
+                <span>➔</span>
+                <span>3. Tu Turno</span>
               </div>
             </div>
 
