@@ -87,7 +87,7 @@ router.post('/users', authenticateToken, requireRole(['ADMIN']), UserController.
 router.put('/users/:id', authenticateToken, requireRole(['ADMIN']), UserController.update);
 
 // Configuraciones del Sistema y Copias de Seguridad
-router.get('/settings', authenticateToken, SettingsController.getAll);
+router.get('/settings', SettingsController.getAll);
 router.post('/settings', authenticateToken, requireRole(['ADMIN']), SettingsController.updateBatch);
 router.post('/settings/reset-daily-queue', authenticateToken, requireRole(['ADMIN']), SettingsController.resetDailyQueue);
 router.get('/settings/backup/download', authenticateToken, requireRole(['ADMIN']), SettingsController.downloadBackup);

@@ -97,12 +97,10 @@ export function AdminSettingsView() {
 
   const loadSettings = async () => {
     setLoading(true);
+    setErrorMsg('');
     try {
-      const [res, tRes] = await Promise.all([
-        api.getSettings(),
-        api.getTunnelStatus()
-      ]);
-      if (res.success) {
+      const res = await api.getSettings();
+      if (res && res.success) {
         if (res.company) setCompany(res.company);
         if (res.settings) {
           const map = {};
@@ -116,11 +114,18 @@ export function AdminSettingsView() {
           setSettings(prev => ({ ...prev, ...map }));
         }
       }
-      if (tRes.success) {
+    } catch (e) {
+      console.warn('Error cargando configuraciones:', e);
+      setErrorMsg(e.message || 'Error al cargar configuraciones');
+    }
+
+    try {
+      const tRes = await api.getTunnelStatus();
+      if (tRes && tRes.success) {
         setTunnelStatus(tRes);
       }
     } catch (e) {
-      setErrorMsg(e.message);
+      console.warn('Error cargando estado del túnel:', e);
     } finally {
       setLoading(false);
     }
