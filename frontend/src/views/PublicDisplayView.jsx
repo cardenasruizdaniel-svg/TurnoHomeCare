@@ -383,84 +383,105 @@ export function PublicDisplayView() {
           </div>
         </div>
 
-        {/* ÁREA DERECHA: Banner Multimedia Rotativo & Código QR Gigante (5 columnas) */}
-        <div className="col-span-12 lg:col-span-5 h-full flex flex-col justify-between gap-3">
+        {/* ÁREA DERECHA: Banner Multimedia Rotativo (50%) & Código QR (50%) */}
+        <div className="col-span-12 lg:col-span-5 h-full flex flex-col gap-4 justify-between">
           
-          {/* 1. Tarjeta Superior: Carrusel Publicitario Multimedia HomeCare IPS */}
-          <div className="rounded-3xl bg-slate-900/90 border border-slate-800 p-4 shadow-xl flex items-center gap-4 relative overflow-hidden shrink-0">
-            {/* Imagen / Miniatura Destacada */}
-            <div className="w-28 h-24 sm:w-32 sm:h-28 rounded-2xl bg-slate-950 overflow-hidden shrink-0 relative border border-slate-800 shadow-md">
-              {currentBanner?.imageUrl ? (
-                <img
-                  src={currentBanner.imageUrl}
-                  alt={currentBanner.title}
-                  className="w-full h-full object-cover transition-transform duration-700 hover:scale-105"
-                />
-              ) : (
-                <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-tr from-pink-900/40 via-purple-900/30 to-teal-900/40 p-2 text-center">
-                  <Sparkles className="w-7 h-7 text-pink-400 mb-1 animate-pulse" />
-                  <span className="font-bold text-white text-[10px]">HomeCare IPS</span>
-                </div>
-              )}
-            </div>
+          {/* 1. Mitad Superior (50%): Carrusel Publicitario Multimedia HomeCare IPS (Prioridad) */}
+          <div className="rounded-3xl bg-slate-900/95 border-2 border-pink-500/30 p-5 shadow-2xl flex-1 flex flex-col justify-between relative overflow-hidden">
+            
+            {/* Cabecera del Banner */}
+            <div className="flex items-center justify-between pb-1">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-pink-500 animate-pulse" />
+                <span className="text-[11px] font-black uppercase tracking-widest text-pink-400">
+                  PUBLICIDAD & SALUD
+                </span>
+              </div>
 
-            {/* Textos del Banner */}
-            <div className="flex-1 min-w-0 space-y-1">
               {currentBanner?.tag && (
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-pink-600/20 text-pink-300 border border-pink-500/30 text-[10px] font-black uppercase tracking-wider">
+                <span className="inline-flex items-center gap-1 px-3 py-0.5 rounded-full bg-pink-600/20 text-pink-300 border border-pink-500/40 text-[10px] font-black uppercase tracking-wider">
                   <Sparkles className="w-3 h-3 text-pink-400" />
                   {currentBanner.tag}
                 </span>
               )}
-              <h3 className="text-sm sm:text-base font-black font-display text-white leading-tight truncate">
-                {currentBanner?.title}
-              </h3>
-              <p className="text-xs text-slate-300 line-clamp-2 leading-snug">
-                {currentBanner?.subtitle}
-              </p>
+            </div>
 
-              {/* Indicadores de Puntos de Navegación */}
+            {/* Contenido Visual: Imagen + Texto */}
+            <div className="my-auto grid grid-cols-12 gap-3 items-center">
+              {/* Imagen del Banner */}
+              <div className="col-span-5 h-28 sm:h-32 rounded-2xl bg-slate-950 overflow-hidden relative border border-slate-800 shadow-md">
+                {currentBanner?.imageUrl ? (
+                  <img
+                    src={currentBanner.imageUrl}
+                    alt={currentBanner.title}
+                    className="w-full h-full object-cover transition-transform duration-700 hover:scale-105"
+                  />
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-tr from-pink-900/40 via-purple-900/30 to-teal-900/40 p-2 text-center">
+                    <Sparkles className="w-8 h-8 text-pink-400 mb-1 animate-pulse" />
+                    <span className="font-bold text-white text-[10px]">HomeCare IPS</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Textos del Banner */}
+              <div className="col-span-7 space-y-1.5 pl-1">
+                <h3 className="text-base sm:text-lg font-black font-display text-white leading-tight">
+                  {currentBanner?.title}
+                </h3>
+                <p className="text-xs text-slate-300 line-clamp-3 leading-relaxed">
+                  {currentBanner?.subtitle}
+                </p>
+              </div>
+            </div>
+
+            {/* Footer de Paginación del Carrusel */}
+            <div className="flex items-center justify-between pt-1 border-t border-slate-800/80">
+              <span className="text-[10px] font-semibold text-slate-400">
+                HomeCare del Quindío I.P.S.
+              </span>
               {banners.length > 1 && (
-                <div className="flex items-center gap-1 pt-1">
+                <div className="flex items-center gap-1.5">
                   {banners.map((_, idx) => (
                     <div
                       key={idx}
                       className={`h-1.5 rounded-full transition-all duration-300 ${
-                        idx === currentSlideIndex ? 'w-5 bg-pink-500' : 'w-1.5 bg-slate-700'
+                        idx === currentSlideIndex ? 'w-6 bg-pink-500' : 'w-2 bg-slate-700'
                       }`}
                     />
                   ))}
                 </div>
               )}
             </div>
+
           </div>
 
-          {/* 2. Tarjeta Central-Inferior: Código QR Gigante para Celular */}
+          {/* 2. Mitad Inferior (50%): Código QR Gigante para Celular */}
           <div className="rounded-3xl bg-slate-900/95 border-2 border-purple-500/30 p-5 shadow-2xl flex-1 flex flex-col justify-between items-center text-center relative overflow-hidden">
             
             {/* Encabezado QR */}
-            <div className="space-y-1">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-purple-500/20 via-pink-500/15 to-teal-500/20 text-purple-200 border border-purple-500/30 text-xs font-black uppercase tracking-wider">
+            <div className="space-y-0.5">
+              <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-gradient-to-r from-purple-500/20 via-pink-500/15 to-teal-500/20 text-purple-200 border border-purple-500/30 text-[11px] font-black uppercase tracking-wider">
                 📱 SOLICITUD MÓVIL (4G / 5G / Wi-Fi)
               </span>
-              <h2 className="text-xl sm:text-2xl font-black font-display text-white tracking-tight">OBTÉN TU TURNO AQUÍ</h2>
-              <p className="text-xs text-slate-300 max-w-xs mx-auto">
-                Apunta con la cámara de tu celular para solicitar tu turno digital sin filas
+              <h2 className="text-lg sm:text-xl font-black font-display text-white tracking-tight">OBTÉN TU TURNO AQUÍ</h2>
+              <p className="text-xs text-slate-300">
+                Apunta con la cámara de tu celular para solicitar tu turno digital
               </p>
             </div>
 
             {/* Código QR Gigante y Nítido */}
-            <div className="my-auto p-4 rounded-3xl bg-white shadow-2xl shadow-purple-500/20 border-4 border-slate-800 hover:scale-105 transition-transform duration-300 flex items-center justify-center">
+            <div className="my-auto p-3.5 rounded-3xl bg-white shadow-2xl shadow-purple-500/20 border-4 border-slate-800 hover:scale-105 transition-transform duration-300 flex items-center justify-center">
               <QRCodeSVG
                 value={publicRequestUrl}
-                size={175}
+                size={155}
                 level="H"
                 includeMargin={false}
               />
             </div>
 
             {/* Instrucciones Rápidas */}
-            <div className="w-full space-y-1">
+            <div className="w-full">
               <div className="flex items-center justify-center gap-2 text-xs font-bold text-teal-300 bg-teal-500/10 py-1.5 px-3 rounded-xl border border-teal-500/20">
                 <span>1. Escanea QR</span>
                 <span>➔</span>
@@ -471,6 +492,7 @@ export function PublicDisplayView() {
             </div>
 
           </div>
+
         </div>
 
       </main>
