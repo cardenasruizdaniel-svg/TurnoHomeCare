@@ -11,6 +11,7 @@ const { setupSocket } = require('./socket/socketHandler');
 const apiRoutes = require('./routes/api');
 const initDatabase = require('./database/init');
 const seedDatabase = require('./database/seed');
+const syncServicesAndCounters = require('./database/syncServicesAndCounters');
 const db = require('./config/database');
 
 const app = express();
@@ -74,9 +75,11 @@ async function startServer() {
     if (!usersCount || usersCount.count === 0) {
       await seedDatabase();
     }
+    await syncServicesAndCounters();
   } catch (e) {
     await initDatabase();
     await seedDatabase();
+    await syncServicesAndCounters();
   }
 
   server.listen(PORT, async () => {
