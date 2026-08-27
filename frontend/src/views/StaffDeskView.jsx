@@ -601,45 +601,40 @@ export function StaffDeskView() {
               </div>
             )}
 
-            {/* BOTÓN PRINCIPAL: LLAMAR SIGUIENTE TURNO */}
+            {/* BOTÓN PRINCIPAL: LLAMAR SIGUIENTE TURNO DEL PUESTO */}
             <div className="pt-4 border-t border-slate-800 space-y-2">
-              {(() => {
-                const hasTicketsToCall = waitingTickets.length > 0 || allBranchWaiting.length > 0;
-                const countToCall = waitingTickets.length > 0 ? waitingTickets.length : allBranchWaiting.length;
-                const isBranchFallback = waitingTickets.length === 0 && allBranchWaiting.length > 0;
-
-                return (
-                  <button
-                    onClick={() => handleCallNext()}
-                    disabled={actionLoading || !hasTicketsToCall}
-                    className={`w-full py-5 rounded-2xl font-black text-base sm:text-lg font-display tracking-wide shadow-xl flex items-center justify-center gap-3 transition-all duration-200 ${
-                      hasTicketsToCall
-                        ? 'bg-gradient-to-r from-emerald-600 via-teal-600 to-sky-600 hover:from-emerald-500 hover:to-sky-500 text-white shadow-emerald-600/25 active:scale-[0.99] cursor-pointer'
-                        : 'bg-slate-800/80 border border-slate-700/80 text-slate-500 shadow-none cursor-not-allowed opacity-50'
-                    }`}
-                  >
-                    <PhoneCall className={`w-6 h-6 ${hasTicketsToCall ? 'animate-pulse text-white' : 'text-slate-600'}`} />
-                    <span>
-                      {hasTicketsToCall 
-                        ? (isBranchFallback 
-                            ? `LLAMAR SIGUIENTE TURNO (${countToCall} EN ESPERA EN SEDE)` 
-                            : `LLAMAR SIGUIENTE TURNO (${countToCall} EN ESPERA)`)
-                        : 'NO HAY PACIENTES EN COLA DE ESPERA'}
-                    </span>
-                  </button>
-                );
-              })()}
+              <button
+                onClick={() => handleCallNext()}
+                disabled={actionLoading || waitingTickets.length === 0}
+                className={`w-full py-5 rounded-2xl font-black text-base sm:text-lg font-display tracking-wide shadow-xl flex items-center justify-center gap-3 transition-all duration-200 ${
+                  waitingTickets.length > 0
+                    ? 'bg-gradient-to-r from-emerald-600 via-teal-600 to-sky-600 hover:from-emerald-500 hover:to-sky-500 text-white shadow-emerald-600/25 active:scale-[0.99] cursor-pointer'
+                    : 'bg-slate-800/80 border border-slate-700/80 text-slate-500 shadow-none cursor-not-allowed opacity-50'
+                }`}
+              >
+                <PhoneCall className={`w-6 h-6 ${waitingTickets.length > 0 ? 'animate-pulse text-white' : 'text-slate-600'}`} />
+                <span>
+                  {waitingTickets.length > 0 
+                    ? `LLAMAR SIGUIENTE TURNO (${waitingTickets.length} EN ESPERA)` 
+                    : `NO HAY TURNOS EN ESPERA PARA ${currentCounterObj?.name ? currentCounterObj.name.toUpperCase() : 'ESTE PUESTO'}`}
+                </span>
+              </button>
               
-              {waitingTickets.length === 0 && allBranchWaiting.length === 0 && (
-                <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800/60 text-center">
+              {waitingTickets.length === 0 && (
+                <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800/60 text-center space-y-1">
                   <span className="text-[11px] font-medium text-slate-400 flex items-center justify-center gap-1.5">
                     <Clock className="w-3.5 h-3.5 text-slate-500" />
-                    El botón se activará automáticamente apenas un paciente solicite su turno desde el celular o ventanilla.
+                    Puesto configurado para: <strong className="text-sky-300">{assignedServices.length > 0 ? assignedServices.join(' • ') : 'Derivaciones directas'}</strong>
                   </span>
+                  {totalBranchWaiting > 0 && (
+                    <p className="text-[11px] text-amber-300/80">
+                      (Hay {totalBranchWaiting} paciente(s) esperando en otros servicios de la IPS. Para atenderlos cambia tu puesto arriba o derívalos).
+                    </p>
+                  )}
                 </div>
               )}
 
-              {recommendedTicket && (waitingTickets.length > 0 || allBranchWaiting.length > 0) && (
+              {recommendedTicket && waitingTickets.length > 0 && (
                 <div className="mt-3 p-3 rounded-xl bg-purple-500/10 border border-purple-500/20 text-center">
                   <span className="text-xs font-semibold text-purple-300 flex items-center justify-center gap-1.5">
                     <Sparkles className="w-4 h-4 text-purple-400" />
@@ -670,6 +665,17 @@ export function StaffDeskView() {
             <div className="grid grid-cols-2 gap-2 bg-slate-950 p-1 rounded-2xl border border-slate-800 text-xs font-bold">
               <button
                 type="button"
+                onClick={() => setQueueTab('module')}
+                className={`py-2 rounded-xl transition cursor-pointer ${
+                  queueTab === 'module'
+                    ? 'bg-sky-600 text-white shadow'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Mi Puesto ({waitingTickets.length})
+              </button>
+              <button
+                type="button"
                 onClick={() => setQueueTab('all')}
                 className={`py-2 rounded-xl transition cursor-pointer ${
                   queueTab === 'all'
@@ -679,25 +685,14 @@ export function StaffDeskView() {
               >
                 Toda la Sede ({totalBranchWaiting})
               </button>
-              <button
-                type="button"
-                onClick={() => setQueueTab('module')}
-                className={`py-2 rounded-xl transition cursor-pointer ${
-                  queueTab === 'module'
-                    ? 'bg-sky-600 text-white shadow'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                Mi Módulo ({waitingTickets.length})
-              </button>
             </div>
 
             {/* Notice if module is empty but branch has tickets */}
             {waitingTickets.length === 0 && totalBranchWaiting > 0 && queueTab === 'module' && (
               <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs space-y-1">
-                <p className="font-bold">No hay turnos específicos para tus servicios asignados.</p>
+                <p className="font-bold">No hay turnos para tus servicios asignados.</p>
                 <p className="text-[11px] text-slate-400">
-                  Hay <strong>{totalBranchWaiting}</strong> turno(s) en espera en la sede. Pulsa "Toda la Sede" arriba para verlos o pulsa el botón principal para llamarlos.
+                  Hay <strong>{totalBranchWaiting}</strong> paciente(s) esperando en otros servicios. Pulsa "Toda la Sede" arriba para ver la fila completa.
                 </p>
               </div>
             )}
@@ -707,29 +702,41 @@ export function StaffDeskView() {
               {(queueTab === 'module' ? waitingTickets : allBranchWaiting).length > 0 ? (
                 (queueTab === 'module' ? waitingTickets : allBranchWaiting).map((t) => {
                   const isRecommended = recommendedTicket?.id === t.id;
+                  const isDirect = t.is_directly_assigned || t.counter_id === selectedCounterId;
+
                   return (
                     <div
                       key={t.id}
                       onClick={() => handleCallNext(t.id)}
                       className={`p-3.5 rounded-2xl border transition-all cursor-pointer group flex items-center justify-between ${
-                        isRecommended
-                          ? 'bg-purple-950/40 border-purple-500/60 shadow-lg shadow-purple-500/10 hover:bg-purple-900/50'
-                          : 'bg-slate-950/60 border-slate-800/80 hover:border-sky-500/50 hover:bg-slate-800/50'
+                        isDirect
+                          ? 'bg-emerald-950/40 border-emerald-500/60 shadow-lg shadow-emerald-500/10 hover:bg-emerald-900/50'
+                          : isRecommended
+                            ? 'bg-purple-950/40 border-purple-500/60 shadow-lg shadow-purple-500/10 hover:bg-purple-900/50'
+                            : 'bg-slate-950/60 border-slate-800/80 hover:border-sky-500/50 hover:bg-slate-800/50'
                       }`}
                     >
                       <div className="space-y-1">
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <span className="font-mono font-black text-base text-white group-hover:text-sky-300 transition">
                             {t.ticket_number}
                           </span>
                           <TypeBadge type={t.ticket_type} />
-                          {isRecommended && (
+                          {isDirect && (
+                            <span className="text-[10px] font-black uppercase tracking-wider text-emerald-300 bg-emerald-500/25 border border-emerald-500/40 px-2 py-0.5 rounded-md animate-pulse">
+                              ★ Derivado a este Consultorio
+                            </span>
+                          )}
+                          {!isDirect && isRecommended && (
                             <span className="text-[10px] font-bold uppercase tracking-wider text-purple-400 bg-purple-500/20 px-2 py-0.5 rounded-md">
                               Recomendado
                             </span>
                           )}
                         </div>
                         <p className="text-xs text-slate-400">{t.patient_name} • <strong className="text-sky-400">{t.service_name}</strong></p>
+                        {t.assigned_counter_name && !isDirect && (
+                          <p className="text-[10px] text-purple-300 font-semibold">➔ Asignado a: {t.assigned_counter_name}</p>
+                        )}
                       </div>
 
                       <div className="text-right">

@@ -57,8 +57,7 @@ class TicketService {
 
     // 1. Obtener o crear paciente
     const patient = this.getOrCreatePatient(patientData);
-
-    // 2. Control anti-duplicados si está habilitado
+    // 2. Control anti-duplicados por servicio si está habilitado
     const preventDuplicates = SettingsService.get('PREVENIR_DUPLICADOS', branchId);
     if (preventDuplicates) {
       const activeTicket = db.prepare(`
@@ -68,14 +67,15 @@ class TicketService {
         JOIN branches b ON t.branch_id = b.id
         WHERE t.patient_id = ? 
           AND t.branch_id = ?
+          AND t.service_id = ?
           AND t.status IN ('ESPERANDO', 'LLAMADO', 'EN_ATENCION')
         ORDER BY t.id DESC LIMIT 1
-      `).get(patient.id, branchId);
+      `).get(patient.id, branchId, service.id);
 
       if (activeTicket) {
         return {
           is_duplicate: true,
-          message: 'Ya tienes un turno activo en proceso.',
+          message: `Ya tienes el turno ${activeTicket.ticket_number} activo en espera para ${activeTicket.service_name}.`,
           ticket: activeTicket
         };
       }
@@ -180,19 +180,26 @@ class TicketService {
       return { ahead_count: 0, estimated_wait_minutes: 0 };
     }
 
-    const aheadCount = db.prepare(`
-      SELECT COUNT(*) as count
-      FROM tickets
+    const countBefore = db.prepare(`
+      SELECT COUNT(*) as count 
+      FROM tickets 
       WHERE branch_id = ? 
-        AND service_id = ?
-        AND status = 'ESPERANDO'
-        AND created_at < ?
-    `).get(branchId, serviceId, targetTicket.created_at).count;
+        AND service_id = ? 
+        AND status = 'ESPERANDO' 
+        AND (
+          ticket_type = 'PRIORITARIO' AND (SELECT ticket_type FROM tickets WHERE id = ?) = 'NORMAL'
+          OR created_at < ?
+        )
+        AND id != ?
+    `).get(branchId, serviceId, ticketId, targetTicket.created_at, ticketId);
 
     const service = db.prepare('SELECT estimated_minutes FROM services WHERE id = ?').get(serviceId);
-    const estimatedMinutes = ((aheadCount + 1) * (service ? service.estimated_minutes : 15));
+    const estPerTicket = service ? service.estimated_minutes : 15;
 
-    return { ahead_count: aheadCount, estimated_wait_minutes: estimatedMinutes };
+    return {
+      ahead_count: countBefore ? countBefore.count : 0,
+      estimated_wait_minutes: (countBefore ? countBefore.count : 0) * estPerTicket
+    };
   }
 
   /**
@@ -221,14 +228,12 @@ class TicketService {
     `).all(counterId).map(s => s.service_id);
 
     if (assignedServices.length === 0) {
-      // Si no tiene asignación específica, atiende todos los servicios de la sede
-      const allServices = db.prepare('SELECT id FROM services WHERE is_active = 1').all().map(s => s.id);
-      assignedServices.push(...allServices);
+      return null;
     }
 
     const placeholders = assignedServices.map(() => '?').join(',');
 
-    // 3. Obtener turnos generales en espera (que no estén bloqueados/asignados a otro consultorio específico)
+    // 3. Obtener turnos generales en espera para los servicios de este módulo
     const waitingTickets = db.prepare(`
       SELECT t.*, s.name as service_name, p.full_name as patient_name, p.age as patient_age
       FROM tickets t
@@ -242,22 +247,7 @@ class TicketService {
     `).all(branchId, counterId, ...assignedServices);
 
     if (waitingTickets.length === 0) {
-      // Fallback: Si no hay turnos para los servicios asignados, buscar en todos los turnos generales de la sede
-      const fallbackTickets = db.prepare(`
-        SELECT t.*, s.name as service_name, p.full_name as patient_name, p.age as patient_age
-        FROM tickets t
-        JOIN services s ON t.service_id = s.id
-        JOIN patients p ON t.patient_id = p.id
-        WHERE t.branch_id = ?
-          AND t.status = 'ESPERANDO'
-          AND (t.counter_id IS NULL OR t.counter_id = ?)
-        ORDER BY t.created_at ASC
-      `).all(branchId, counterId);
-
-      if (fallbackTickets.length === 0) {
-        return null;
-      }
-      return fallbackTickets[0];
+      return null;
     }
 
     const normalTickets = waitingTickets.filter(t => t.ticket_type === 'NORMAL');
