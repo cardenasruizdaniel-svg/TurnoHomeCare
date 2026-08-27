@@ -11,18 +11,23 @@ class SoundService {
 
   static initVoices() {
     if (typeof window === 'undefined' || !window.speechSynthesis) return;
-    if (this.voicesInitialized) return;
+    if (this.voicesInitialized && this.cachedVoice) return;
 
     const loadVoices = () => {
-      const voices = window.speechSynthesis.getVoices();
-      if (voices.length > 0) {
-        // Priorizar español latinoamericano o colombiano, luego español de España
-        this.cachedVoice = voices.find(v => v.lang === 'es-CO' || v.lang === 'es_CO')
-          || voices.find(v => v.lang === 'es-US' || v.lang === 'es_US')
-          || voices.find(v => v.lang === 'es-MX' || v.lang === 'es_MX')
-          || voices.find(v => v.lang.startsWith('es') || v.lang.includes('Spanish'))
-          || null;
-        this.voicesInitialized = true;
+      try {
+        const voices = window.speechSynthesis.getVoices();
+        if (voices.length > 0) {
+          // Priorizar voces en español (Latinoamérica, Colombia, México o España)
+          this.cachedVoice = voices.find(v => v.lang === 'es-CO' || v.lang === 'es_CO')
+            || voices.find(v => v.lang === 'es-419')
+            || voices.find(v => v.lang === 'es-US' || v.lang === 'es_US')
+            || voices.find(v => v.lang === 'es-MX' || v.lang === 'es_MX')
+            || voices.find(v => v.lang.startsWith('es') || v.lang.includes('Spanish') || v.name.toLowerCase().includes('spanish'))
+            || voices[0];
+          this.voicesInitialized = true;
+        }
+      } catch (e) {
+        console.warn('Error cargando voces:', e);
       }
     };
 
@@ -54,7 +59,7 @@ class SoundService {
 
       const now = ctx.currentTime;
       const gainNode = ctx.createGain();
-      gainNode.gain.setValueAtTime(0.35 * volume, now);
+      gainNode.gain.setValueAtTime(0.4 * volume, now);
       gainNode.gain.exponentialRampToValueAtTime(0.001, now + 1.8);
       gainNode.connect(ctx.destination);
 
@@ -79,7 +84,7 @@ class SoundService {
       osc3.type = 'triangle';
       osc3.frequency.setValueAtTime(880, now + 0.28);
       const gain3 = ctx.createGain();
-      gain3.gain.setValueAtTime(0.09 * volume, now + 0.28);
+      gain3.gain.setValueAtTime(0.1 * volume, now + 0.28);
       gain3.gain.exponentialRampToValueAtTime(0.001, now + 1.3);
       osc3.connect(gain3);
       gain3.connect(ctx.destination);
@@ -92,35 +97,76 @@ class SoundService {
   }
 
   /**
-   * Pronuncia el llamado usando Web Speech API
+   * Pronuncia el llamado usando Web Speech API y fallback de Audio Stream (Smart TV & Mobile)
    */
   static speak(text, options = {}) {
-    if (typeof window === 'undefined' || !window.speechSynthesis) return;
+    if (typeof window === 'undefined') return;
 
-    try {
-      this.initVoices();
-      if (window.speechSynthesis.paused) {
-        window.speechSynthesis.resume();
-      }
-      window.speechSynthesis.cancel(); // Cancelar cualquier locución anterior
+    let spokenLocally = false;
 
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = options.rate || 0.90; // Pausado y natural
-      utterance.pitch = options.pitch || 1.0;
-      utterance.volume = options.volume !== undefined ? options.volume : 1.0;
-      utterance.lang = 'es-CO';
+    // 1. Intentar Web Speech API si está disponible en el navegador
+    if (typeof window.speechSynthesis !== 'undefined' && window.speechSynthesis) {
+      try {
+        this.initVoices();
+        if (window.speechSynthesis.paused) {
+          window.speechSynthesis.resume();
+        }
+        window.speechSynthesis.cancel();
 
-      if (this.cachedVoice) {
-        utterance.voice = this.cachedVoice;
-      } else {
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = options.rate || 0.88; // Pausado y natural
+        utterance.pitch = options.pitch || 1.0;
+        utterance.volume = options.volume !== undefined ? options.volume : 1.0;
+
         const voices = window.speechSynthesis.getVoices();
-        const spanish = voices.find(v => v.lang.startsWith('es'));
-        if (spanish) utterance.voice = spanish;
-      }
+        const spanish = voices.find(v => v.lang && (v.lang.startsWith('es') || v.lang.includes('Spanish')));
+        if (spanish) {
+          utterance.voice = spanish;
+          utterance.lang = spanish.lang;
+        } else {
+          utterance.lang = 'es-ES';
+        }
 
-      window.speechSynthesis.speak(utterance);
+        let started = false;
+        utterance.onstart = () => {
+          started = true;
+        };
+        utterance.onerror = (e) => {
+          console.warn('SpeechSynthesis error, ejecutando audio stream fallback:', e);
+          this.playAudioStream(text, options.volume);
+        };
+
+        window.speechSynthesis.speak(utterance);
+        spokenLocally = true;
+
+        // Si tras 700ms no ha iniciado (común en Smart TVs sin paquete TTS), usar stream de audio
+        setTimeout(() => {
+          if (!started && !window.speechSynthesis.speaking) {
+            this.playAudioStream(text, options.volume);
+          }
+        }, 700);
+
+      } catch (e) {
+        console.warn('Fallo en SpeechSynthesis local:', e);
+      }
+    }
+
+    if (!spokenLocally) {
+      this.playAudioStream(text, options.volume);
+    }
+  }
+
+  static playAudioStream(text, volume = 1.0) {
+    try {
+      const cleanText = encodeURIComponent(text);
+      const url = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=es&q=${cleanText}`;
+      const audio = new Audio(url);
+      audio.volume = volume !== undefined ? volume : 1.0;
+      audio.play().catch(e => {
+        console.warn('Audio fallback error:', e);
+      });
     } catch (e) {
-      console.warn('Error en síntesis de voz:', e);
+      console.warn('No se pudo inicializar audio stream:', e);
     }
   }
 
