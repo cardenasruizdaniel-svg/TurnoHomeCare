@@ -16,6 +16,7 @@ import {
   RotateCcw,
   Image,
   Tv,
+  Plus,
   Trash2,
   Megaphone,
   Upload,
