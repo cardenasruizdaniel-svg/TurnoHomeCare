@@ -115,9 +115,10 @@ export function PublicDisplayView() {
   const recentTickets = displayData?.recent_tickets || [];
   const company = displayData?.company || { name: 'IPS Salud Integral & Vida' };
   const branch = displayData?.branch || { name: 'Sede Principal' };
-  const publicRequestUrl = displayData?.public_request_url 
-    || (displayData?.settings?.PUBLIC_APP_URL?.value ? `${displayData.settings.PUBLIC_APP_URL.value}/solicitar-turno?branchId=${branchId}` : null)
-    || `${window.location.origin}/solicitar-turno?branchId=${branchId}`;
+  const isRealDomain = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
+  const publicRequestUrl = isRealDomain
+    ? `${window.location.origin}/solicitar-turno?branchId=${branchId}`
+    : (displayData?.public_request_url || `${window.location.origin}/solicitar-turno?branchId=${branchId}`);
   const bannerMessage = displayData?.settings?.MENSAJE_PANTALLA?.value || 'Por favor permanezca atento a la pantalla y cuide sus pertenencias.';
 
   return (

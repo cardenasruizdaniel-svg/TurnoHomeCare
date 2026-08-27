@@ -153,6 +153,12 @@ class TunnelService {
    * Obtiene la mejor URL para generar los códigos QR (Túnel HTTPS Activo > Dominio Personalizado > IP Wi-Fi Local)
    */
   static getEffectivePublicUrl(port = 5000) {
+    if (process.env.RENDER_EXTERNAL_URL && process.env.RENDER_EXTERNAL_URL.startsWith('http')) {
+      return process.env.RENDER_EXTERNAL_URL;
+    }
+    if (process.env.PUBLIC_APP_URL && process.env.PUBLIC_APP_URL.startsWith('http')) {
+      return process.env.PUBLIC_APP_URL;
+    }
     if (this.currentPublicUrl && this.currentPublicUrl.startsWith('http')) {
       return this.currentPublicUrl;
     }
