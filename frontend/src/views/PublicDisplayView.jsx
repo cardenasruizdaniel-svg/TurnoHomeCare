@@ -61,6 +61,21 @@ export function PublicDisplayView() {
     };
   }, [audioEnabled]);
 
+  const audioEnabledRef = useRef(audioEnabled);
+  const displayDataRef = useRef(displayData);
+
+  useEffect(() => {
+    audioEnabledRef.current = audioEnabled;
+  }, [audioEnabled]);
+
+  useEffect(() => {
+    displayDataRef.current = displayData;
+  }, [displayData]);
+
+  useEffect(() => {
+    SoundService.init();
+  }, []);
+
   // Carga inicial
   const loadDisplayData = async () => {
     try {
@@ -93,18 +108,18 @@ export function PublicDisplayView() {
           setCallingAnimation(false);
         }, 8000);
 
-        // Reproducir sonido y voz si el usuario activó el audio
-        if (audioEnabled && ticket) {
-          const settings = displayData?.settings || {};
-          const playSound = settings.SONIDO_CAMPANA?.value !== false;
-          const playVoice = settings.VOZ_SINTETIZADA?.value !== false;
-          const volume = Number(settings.VOLUMEN_AUDIO?.value || 1.0);
-          const repetitions = Number(settings.REPETICIONES_LLAMADO?.value || 1);
-          const template = settings.PLANTILLA_VOZ?.value;
+        // Reproducir sonido y voz si el audio está activo
+        if (audioEnabledRef.current && ticket) {
+          const currentSettings = displayDataRef.current?.settings || {};
+          const playSound = currentSettings.SONIDO_CAMPANA?.value !== false;
+          const playVoice = currentSettings.VOZ_SINTETIZADA?.value !== false;
+          const volume = Number(currentSettings.VOLUMEN_AUDIO?.value || 1.0);
+          const repetitions = Number(currentSettings.REPETICIONES_LLAMADO?.value || 1);
+          const template = currentSettings.PLANTILLA_VOZ?.value;
 
           SoundService.announceTicket({
             ticketNumber: ticket.ticket_number,
-            counterName: ticket.counter_name,
+            counterName: ticket.counter_name || (ticket.counter_code ? `Consultorio ${ticket.counter_code}` : 'Consultorio'),
             template,
             playSound,
             playVoice,
@@ -138,7 +153,7 @@ export function PublicDisplayView() {
         socket.off('config:updated', handleConfigUpdated);
       };
     }
-  }, [connected, socket, branchId, audioEnabled, displayData]);
+  }, [connected, socket, branchId]);
 
   const currentTicket = displayData?.current_ticket;
   const recentTickets = displayData?.recent_tickets || [];

@@ -56,6 +56,17 @@ export function StaffDeskView() {
   const [targetServiceId, setTargetServiceId] = useState('');
   const [transferNotes, setTransferNotes] = useState('');
 
+  // Modal para Expedir Turno Manual (Adulto Mayor / Sin Celular)
+  const [isManualModalOpen, setIsManualModalOpen] = useState(false);
+  const [manualDoc, setManualDoc] = useState('');
+  const [manualName, setManualName] = useState('');
+  const [manualAge, setManualAge] = useState('');
+  const [manualPhone, setManualPhone] = useState('');
+  const [manualServiceId, setManualServiceId] = useState('');
+  const [manualIsPriority, setManualIsPriority] = useState(false);
+  const [manualCheckingDoc, setManualCheckingDoc] = useState(false);
+  const [createdManualTicket, setCreatedManualTicket] = useState(null);
+
   const branchId = user?.branch_id || 1;
 
   // Cargar módulos y servicios disponibles
@@ -281,6 +292,72 @@ export function StaffDeskView() {
     }
   };
 
+  // 8. EXPEDIR TURNO MANUAL (ADULTO MAYOR / PRESENCIAL)
+  const handleManualDocBlur = async () => {
+    if (!manualDoc || manualDoc.trim().length < 4) return;
+    setManualCheckingDoc(true);
+    try {
+      const res = await api.checkPatient(manualDoc.trim());
+      if (res.success && res.exists && res.patient) {
+        setManualName(res.patient.full_name || '');
+        setManualAge(res.patient.age ? String(res.patient.age) : '');
+        setManualPhone(res.patient.phone || '');
+        if (Number(res.patient.age) >= 60 || res.patient.is_priority_auto) {
+          setManualIsPriority(true);
+        }
+      }
+    } catch (e) {
+      console.warn('Error verificando documento:', e);
+    } finally {
+      setManualCheckingDoc(false);
+    }
+  };
+
+  const handleManualAgeChange = (val) => {
+    setManualAge(val);
+    if (Number(val) >= 60) {
+      setManualIsPriority(true);
+    }
+  };
+
+  const handleCreateManualTicket = async (e) => {
+    if (e) e.preventDefault();
+    if (!manualDoc.trim() || !manualName.trim() || !manualServiceId) {
+      setErrorMsg('Por favor completa la cédula, el nombre y el servicio requerido.');
+      return;
+    }
+    setActionLoading(true);
+    setErrorMsg('');
+    try {
+      const res = await api.requestTicket({
+        branchId,
+        serviceId: Number(manualServiceId),
+        patientData: {
+          documentNumber: manualDoc.trim(),
+          fullName: manualName.trim(),
+          age: manualAge ? Number(manualAge) : 35,
+          phone: manualPhone.trim() || null,
+          isPriority: manualIsPriority
+        }
+      });
+      if (res.success && res.ticket) {
+        setCreatedManualTicket(res.ticket);
+        setSuccessMsg(`Turno ${res.ticket.ticket_number} generado exitosamente.`);
+        setManualDoc('');
+        setManualName('');
+        setManualAge('');
+        setManualPhone('');
+        setManualServiceId('');
+        setManualIsPriority(false);
+        loadQueueAndStatus();
+      }
+    } catch (err) {
+      setErrorMsg(err.message || 'Error al generar turno manual');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const currentCounterObj = counters.find(c => c.id === selectedCounterId);
 
   return (
@@ -300,34 +377,48 @@ export function StaffDeskView() {
           </div>
         </div>
 
-        {/* Counter / Consultorio Selector */}
-        <div className="flex flex-col sm:items-end gap-1.5">
-          <div className="flex items-center gap-3">
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-400">
-              Mi Puesto de Trabajo:
-            </label>
-            <select
-              value={selectedCounterId}
-              onChange={(e) => setSelectedCounterId(Number(e.target.value))}
-              className="px-4 py-2.5 rounded-2xl bg-slate-950 border border-slate-700 text-sm font-bold text-emerald-400 focus:outline-none focus:border-emerald-500 shadow-inner"
-            >
-              {counters.map(c => (
-                <option key={c.id} value={c.id}>
-                  {c.name} ({c.code})
-                </option>
-              ))}
-            </select>
-          </div>
-          {assignedServices.length > 0 && (
-            <div className="flex flex-wrap items-center gap-1.5 justify-end">
-              <span className="text-[10px] text-slate-500 font-semibold">Servicios asignados:</span>
-              {assignedServices.map((s, idx) => (
-                <span key={idx} className="px-2 py-0.5 rounded-md bg-slate-800 border border-slate-700 text-[10px] font-bold text-sky-300">
-                  {s}
-                </span>
-              ))}
+        {/* Quick Action: Expedir Turno Manual & Counter Selector */}
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={() => {
+              setCreatedManualTicket(null);
+              setIsManualModalOpen(true);
+            }}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-pink-600 to-rose-500 hover:from-pink-500 hover:to-rose-400 text-white font-bold text-xs shadow-lg shadow-pink-600/25 transition active:scale-95 cursor-pointer"
+          >
+            <Sparkles className="w-4 h-4" />
+            <span>+ EXPEDIR TURNO (ADULTO MAYOR / PRESENCIAL)</span>
+          </button>
+
+          <div className="flex flex-col sm:items-end gap-1">
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                Puesto:
+              </label>
+              <select
+                value={selectedCounterId}
+                onChange={(e) => setSelectedCounterId(Number(e.target.value))}
+                className="px-3.5 py-2 rounded-2xl bg-slate-950 border border-slate-700 text-xs font-bold text-emerald-400 focus:outline-none focus:border-emerald-500 shadow-inner"
+              >
+                {counters.map(c => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} ({c.code})
+                  </option>
+                ))}
+              </select>
             </div>
-          )}
+            {assignedServices.length > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5 justify-end">
+                <span className="text-[10px] text-slate-500 font-semibold">Servicios asignados:</span>
+                {assignedServices.map((s, idx) => (
+                  <span key={idx} className="px-2 py-0.5 rounded-md bg-slate-800 border border-slate-700 text-[10px] font-bold text-sky-300">
+                    {s}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -738,6 +829,171 @@ export function StaffDeskView() {
             </button>
           </div>
         </form>
+      </Modal>
+
+      {/* Modal para Expedir Turno Manual (Adulto Mayor / Pacientes Sin Celular) */}
+      <Modal
+        isOpen={isManualModalOpen}
+        onClose={() => setIsManualModalOpen(false)}
+        title="Expedir Turno Presencial / Adulto Mayor"
+      >
+        {createdManualTicket ? (
+          <div className="space-y-6 text-center">
+            <div className="p-6 rounded-3xl bg-slate-950 border-2 border-pink-500/40 shadow-2xl space-y-3">
+              <span className="px-3 py-1 rounded-full bg-pink-500/20 text-pink-300 text-xs font-bold uppercase">
+                {createdManualTicket.ticket_type === 'PRIORITARIO' ? '⭐ Turno Prioritario' : 'Turno Normal'}
+              </span>
+              <div className="font-display font-black text-6xl text-white tracking-tight py-2">
+                {createdManualTicket.ticket_number}
+              </div>
+              <p className="text-sm font-bold text-teal-400 uppercase">
+                {createdManualTicket.service_name}
+              </p>
+              <div className="pt-2 border-t border-slate-800 text-xs text-slate-300 space-y-1">
+                <p>Paciente: <strong className="text-white">{createdManualTicket.patient_name}</strong></p>
+                <p>Cédula: <strong className="font-mono text-slate-200">{createdManualTicket.document_number}</strong></p>
+              </div>
+            </div>
+
+            <div className="flex gap-3 justify-center">
+              <button
+                type="button"
+                onClick={() => {
+                  window.print();
+                }}
+                className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition"
+              >
+                Imprimir Comprobante
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setCreatedManualTicket(null);
+                  setIsManualModalOpen(false);
+                }}
+                className="px-6 py-2.5 rounded-xl bg-pink-600 hover:bg-pink-500 text-white text-xs font-bold shadow-lg shadow-pink-600/30 transition"
+              >
+                Listo / Cerrar
+              </button>
+            </div>
+          </div>
+        ) : (
+          <form onSubmit={handleCreateManualTicket} className="space-y-4 text-xs">
+            <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800 text-slate-400 text-[11px] leading-relaxed">
+              Utiliza este formulario para expedir un turno a pacientes de la tercera edad, personas sin teléfono móvil o con dificultades para escanear el código QR.
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="font-bold text-slate-300 block">Número de Cédula / Documento *</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  required
+                  placeholder="Ej: 4516342"
+                  value={manualDoc}
+                  onChange={(e) => setManualDoc(e.target.value.replace(/\D/g, ''))}
+                  onBlur={handleManualDocBlur}
+                  className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-700 font-mono font-bold text-white focus:outline-none focus:border-pink-500"
+                />
+                {manualCheckingDoc && (
+                  <p className="text-[10px] text-sky-400">Buscando paciente...</p>
+                )}
+              </div>
+
+              <div className="space-y-1">
+                <label className="font-bold text-slate-300 block">Nombre Completo del Paciente *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ej: Daniel Cárdenas Ruiz"
+                  value={manualName}
+                  onChange={(e) => setManualName(e.target.value)}
+                  className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-700 font-bold text-white focus:outline-none focus:border-pink-500"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="font-bold text-slate-300 block">Edad (Años)</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="120"
+                  placeholder="Ej: 65"
+                  value={manualAge}
+                  onChange={(e) => handleManualAgeChange(e.target.value)}
+                  className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white focus:outline-none focus:border-pink-500"
+                />
+                {Number(manualAge) >= 60 && (
+                  <span className="text-[10px] font-bold text-purple-400 block">
+                    ⭐ Atención Prioritaria Automática (Adulto Mayor $\ge 60$)
+                  </span>
+                )}
+              </div>
+
+              <div className="space-y-1">
+                <label className="font-bold text-slate-300 block">Teléfono / Celular (Opcional)</label>
+                <input
+                  type="tel"
+                  placeholder="Ej: 3101234567"
+                  value={manualPhone}
+                  onChange={(e) => setManualPhone(e.target.value)}
+                  className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white focus:outline-none focus:border-pink-500"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="font-bold text-slate-300 block">Servicio Médico Requerido *</label>
+              <select
+                required
+                value={manualServiceId}
+                onChange={(e) => setManualServiceId(e.target.value)}
+                className="w-full p-3 rounded-xl bg-slate-950 border border-slate-700 font-bold text-sky-400 focus:outline-none focus:border-pink-500"
+              >
+                <option value="">-- Selecciona el servicio --</option>
+                {services.map(s => (
+                  <option key={s.id} value={s.id}>
+                    {s.name} ({s.code}) - {s.description}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
+              <div>
+                <span className="font-bold text-slate-200 block">Clasificar como Turno Prioritario</span>
+                <span className="text-[10px] text-slate-400">Adultos mayores, personas con movilidad reducida o mujeres embarazadas</span>
+              </div>
+              <input
+                type="checkbox"
+                checked={manualIsPriority}
+                onChange={(e) => setManualIsPriority(e.target.checked)}
+                className="w-5 h-5 rounded text-pink-600 focus:ring-pink-500 cursor-pointer"
+              />
+            </div>
+
+            <div className="flex gap-3 justify-end pt-2 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setIsManualModalOpen(false)}
+                className="px-4 py-2 rounded-xl bg-slate-800 text-slate-400 hover:text-white font-semibold"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={actionLoading}
+                className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-pink-600 to-rose-500 hover:from-pink-500 hover:to-rose-400 text-white font-bold shadow-lg shadow-pink-600/30 transition disabled:opacity-50 cursor-pointer"
+              >
+                <Sparkles className="w-4 h-4" />
+                <span>{actionLoading ? 'Expidiendo...' : 'Expedir Turno al Paciente'}</span>
+              </button>
+            </div>
+          </form>
+        )}
       </Modal>
 
     </div>
