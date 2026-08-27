@@ -159,14 +159,14 @@ class SoundService {
   static playAudioStream(text, volume = 1.0) {
     try {
       const cleanText = encodeURIComponent(text);
-      const url = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=es&q=${cleanText}`;
+      const url = `/api/tts?text=${cleanText}`;
       const audio = new Audio(url);
       audio.volume = volume !== undefined ? volume : 1.0;
       audio.play().catch(e => {
-        console.warn('Audio fallback error:', e);
+        console.warn('Audio stream error:', e);
       });
     } catch (e) {
-      console.warn('No se pudo inicializar audio stream:', e);
+      console.warn('No se pudo reproducir audio stream:', e);
     }
   }
 

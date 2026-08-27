@@ -14,10 +14,12 @@ const SettingsController = require('../controllers/settingsController');
 const StatsController = require('../controllers/statsController');
 const AuditController = require('../controllers/auditController');
 const TunnelController = require('../controllers/tunnelController');
+const TTSController = require('../controllers/ttsController');
 
 // -------------------------------------------------------------
-// 0. CONTROL DE TÚNEL PÚBLICO (4G / 5G)
+// 0. CONTROL DE TÚNEL PÚBLICO (4G / 5G) Y TTS STREAM
 // -------------------------------------------------------------
+router.get('/tts', TTSController.streamSpeech);
 router.get('/tunnel/status', TunnelController.getStatus);
 router.post('/tunnel/start', TunnelController.start);
 router.post('/tunnel/stop', TunnelController.stop);

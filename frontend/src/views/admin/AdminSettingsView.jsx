@@ -18,7 +18,8 @@ import {
   Tv,
   Plus,
   Trash2,
-  Megaphone
+  Megaphone,
+  Upload
 } from 'lucide-react';
 import { api } from '../../services/api';
 import { useBranding } from '../../context/BrandingContext';
@@ -261,6 +262,72 @@ export function AdminSettingsView() {
       ]
     }));
     setSuccessMsg('Plantilla publicitaria de HomeCare IPS cargada.');
+  };
+
+  const processImageFile = (file, maxWidth = 1200, quality = 0.85) => {
+    return new Promise((resolve, reject) => {
+      if (!file || !file.type.startsWith('image/')) {
+        return reject(new Error('El archivo seleccionado no es una imagen válida.'));
+      }
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new window.Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+
+          const dataUrl = canvas.toDataURL('image/jpeg', quality);
+          resolve(dataUrl);
+        };
+        img.onerror = () => reject(new Error('No se pudo procesar la imagen seleccionada.'));
+        img.src = e.target.result;
+      };
+      reader.onerror = () => reject(new Error('Error al leer el archivo.'));
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleBannerFileSelect = async (idx, e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      setSaving(true);
+      const dataUrl = await processImageFile(file, 1200, 0.85);
+      handleBannerChange(idx, 'imageUrl', dataUrl);
+      setSuccessMsg(`Imagen para Slide #${idx + 1} cargada con éxito.`);
+    } catch (err) {
+      setErrorMsg(err.message || 'Error al procesar archivo de imagen.');
+    } finally {
+      setSaving(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleLogoFileSelect = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      setSaving(true);
+      const dataUrl = await processImageFile(file, 400, 0.90);
+      setCompany(prev => ({ ...prev, logo_url: dataUrl }));
+      setSuccessMsg('Logo institucional cargado con éxito.');
+    } catch (err) {
+      setErrorMsg(err.message || 'Error al procesar archivo de logo.');
+    } finally {
+      setSaving(false);
+      e.target.value = '';
+    }
   };
 
   return (
@@ -625,14 +692,58 @@ export function AdminSettingsView() {
                       </div>
                     </div>
 
-                    {/* Image Preview */}
-                    <div className="h-28 rounded-xl bg-slate-900 border border-slate-800 overflow-hidden relative">
+                    {/* Image Preview & File Upload */}
+                    <div className="h-32 rounded-xl bg-slate-900 border border-slate-800 overflow-hidden relative group/img">
                       {b.imageUrl ? (
                         <img src={b.imageUrl} alt={b.title} className="w-full h-full object-cover" />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center text-slate-600 text-xs">
-                          Sin imagen
+                        <div className="w-full h-full flex flex-col items-center justify-center text-slate-500 text-xs gap-1">
+                          <Image className="w-6 h-6 text-slate-600" />
+                          <span>Sin foto asignada</span>
                         </div>
+                      )}
+
+                      {/* Botón Flotante para Cambiar Foto */}
+                      <div className="absolute inset-0 bg-slate-950/70 opacity-0 group-hover/img:opacity-100 flex items-center justify-center gap-2 transition">
+                        <button
+                          type="button"
+                          onClick={() => document.getElementById(`banner-file-${idx}`)?.click()}
+                          className="px-3 py-1.5 rounded-lg bg-pink-600 hover:bg-pink-500 text-white text-xs font-bold shadow-lg flex items-center gap-1 cursor-pointer"
+                        >
+                          <Upload className="w-3.5 h-3.5" />
+                          <span>Cambiar Foto</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Selector de Archivo Oculto */}
+                    <input
+                      type="file"
+                      id={`banner-file-${idx}`}
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => handleBannerFileSelect(idx, e)}
+                    />
+
+                    {/* Botón Principal de Carga de Archivo */}
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => document.getElementById(`banner-file-${idx}`)?.click()}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-pink-600/20 hover:bg-pink-600/30 border border-pink-500/40 text-pink-300 font-bold text-xs transition cursor-pointer"
+                      >
+                        <Upload className="w-3.5 h-3.5" />
+                        <span>📁 Subir Foto desde mi Equipo</span>
+                      </button>
+                      {b.imageUrl && (
+                        <button
+                          type="button"
+                          onClick={() => handleBannerChange(idx, 'imageUrl', '')}
+                          className="p-2 rounded-xl bg-slate-900 hover:bg-rose-950/50 border border-slate-700 text-slate-400 hover:text-rose-400 text-xs transition"
+                          title="Quitar foto"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       )}
                     </div>
 
@@ -671,10 +782,10 @@ export function AdminSettingsView() {
                       </div>
 
                       <div>
-                        <label className="text-[10px] text-slate-500 font-bold block">URL de Imagen</label>
+                        <label className="text-[10px] text-slate-500 font-bold block">O ingresar URL de Imagen</label>
                         <input
                           type="text"
-                          placeholder="https://..."
+                          placeholder="https://... o archivo cargado"
                           value={b.imageUrl || ''}
                           onChange={(e) => handleBannerChange(idx, 'imageUrl', e.target.value)}
                           className="w-full p-1.5 rounded-lg bg-slate-900 border border-slate-700 text-sky-400 font-mono text-[11px]"
@@ -801,9 +912,27 @@ export function AdminSettingsView() {
                     <Building2 className="w-10 h-10 text-slate-400" />
                   )}
                 </div>
+
+                <input
+                  type="file"
+                  id="company-logo-file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleLogoFileSelect}
+                />
+
+                <button
+                  type="button"
+                  onClick={() => document.getElementById('company-logo-file')?.click()}
+                  className="w-full py-1.5 px-3 rounded-xl bg-pink-600/20 hover:bg-pink-600/30 border border-pink-500/40 text-pink-300 font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>Subir Logo desde Archivo</span>
+                </button>
+
                 <input
                   type="text"
-                  placeholder="URL del logo (/homecare-logo.png)"
+                  placeholder="O URL del logo (/homecare-logo.png)"
                   value={company.logo_url || ''}
                   onChange={(e) => setCompany({ ...company, logo_url: e.target.value })}
                   className="w-full p-2 text-center rounded-xl bg-slate-900 border border-slate-700 text-xs text-white font-mono"
