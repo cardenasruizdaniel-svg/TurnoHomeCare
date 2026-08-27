@@ -24,13 +24,13 @@ FROM node:20-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
-ENV PORT=5000
+ENV PORT=10000
 
 # Copiar backend y frontend compilado
 COPY --from=builder /app/backend ./backend
 COPY --from=builder /app/frontend/dist ./frontend/dist
 COPY --from=builder /app/package*.json ./
 
-EXPOSE 5000
+EXPOSE 10000
 
 CMD ["node", "backend/src/server.js"]
