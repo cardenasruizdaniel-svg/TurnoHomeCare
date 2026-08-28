@@ -22,22 +22,22 @@ async function seedDatabase() {
       `).run();
     }
 
-    // 3. Sedes
+    // 3. Sedes Oficiales HomeCare del Quindío
     const insertBranch = db.prepare(`
       INSERT OR IGNORE INTO branches (id, company_id, code, name, address, phone, business_hours, qr_code_slug)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
     insertBranch.run(
-      1, 1, 'SEDE-PRINCIPAL', 'Sede Central - Hospitalaria',
-      'Av. Principal # 45-67, Edificio Médico', '(601) 745-9000',
-      'Lunes a Viernes: 6:00 AM - 7:00 PM | Sábados: 7:00 AM - 2:00 PM',
-      'sede-central'
+      1, 1, 'SEDE-ARMENIA', 'Sede Principal (Armenia)',
+      'Carrera 13 #3N 50, medicentro Alcazar cons 706', '+57 323 479 0311',
+      'Lunes a Viernes: 7:00 AM - 6:00 PM | Sábados: 8:00 AM - 1:00 PM',
+      'sede-armenia'
     );
     insertBranch.run(
-      2, 1, 'SEDE-NORTE', 'Sede Norte - Centro Especialistas',
-      'Calle 127 # 15-30', '(601) 745-9001',
+      2, 1, 'SEDE-CIRCASIA', 'Sede Circasia',
+      'Calle 6 No 15-19', '+57 323 479 0311',
       'Lunes a Viernes: 7:00 AM - 5:00 PM',
-      'sede-norte'
+      'sede-circasia'
     );
 
     // 4. Servicios Oficiales HomeCare del Quindío (15 Servicios)

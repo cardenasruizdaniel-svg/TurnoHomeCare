@@ -81,17 +81,24 @@ class CounterController {
   static update(req, res) {
     try {
       const { id } = req.params;
-      const { code, name, is_active, service_ids } = req.body;
+      const { branch_id, code, name, is_active, service_ids } = req.body;
 
       const transaction = db.transaction(() => {
         db.prepare(`
           UPDATE counters
-          SET code = COALESCE(?, code),
+          SET branch_id = COALESCE(?, branch_id),
+              code = COALESCE(?, code),
               name = COALESCE(?, name),
               is_active = COALESCE(?, is_active),
               updated_at = CURRENT_TIMESTAMP
           WHERE id = ?
-        `).run(code ? code.toUpperCase() : null, name, is_active !== undefined ? (is_active ? 1 : 0) : null, id);
+        `).run(
+          branch_id !== undefined && branch_id !== null ? Number(branch_id) : null,
+          code ? code.toUpperCase() : null,
+          name,
+          is_active !== undefined ? (is_active ? 1 : 0) : null,
+          id
+        );
 
         if (Array.isArray(service_ids)) {
           db.prepare('DELETE FROM counter_services WHERE counter_id = ?').run(id);
@@ -105,11 +112,11 @@ class CounterController {
       transaction();
 
       AuditService.log({
-        userId: req.user.id,
+        userId: req.user ? req.user.id : null,
         action: 'UPDATE_COUNTER',
         entity: 'COUNTER',
         entityId: id,
-        details: { code, name }
+        details: { branch_id, code, name }
       });
 
       res.json({ success: true, message: 'Módulo actualizado con éxito' });

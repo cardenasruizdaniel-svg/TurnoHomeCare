@@ -138,6 +138,27 @@ const officialServices = [
   }
 ];
 
+const officialBranches = [
+  {
+    id: 1,
+    code: 'SEDE-ARMENIA',
+    name: 'Sede Principal (Armenia)',
+    address: 'Carrera 13 #3N 50, medicentro Alcazar cons 706',
+    phone: '+57 323 479 0311',
+    business_hours: 'Lunes a Viernes: 7:00 AM - 6:00 PM | Sábados: 8:00 AM - 1:00 PM',
+    qr_code_slug: 'sede-armenia'
+  },
+  {
+    id: 2,
+    code: 'SEDE-CIRCASIA',
+    name: 'Sede Circasia',
+    address: 'Calle 6 No 15-19',
+    phone: '+57 323 479 0311',
+    business_hours: 'Lunes a Viernes: 7:00 AM - 5:00 PM',
+    qr_code_slug: 'sede-circasia'
+  }
+];
+
 const officialCounters = [
   { code: "TERAPIA", name: "Salón de Terapias" },
   { code: "ENT-1", name: "Entrevista 1" },
@@ -149,6 +170,23 @@ const officialCounters = [
 
 async function syncServicesAndCounters() {
   try {
+    // 0. Sincronizar Sedes Oficiales HomeCare
+    for (const b of officialBranches) {
+      const existing = db.prepare("SELECT id FROM branches WHERE id = ? OR code = ?").get(b.id, b.code);
+      if (existing) {
+        db.prepare(`
+          UPDATE branches
+          SET code = ?, name = ?, address = ?, phone = ?, business_hours = ?, qr_code_slug = ?, is_active = 1, updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).run(b.code, b.name, b.address, b.phone, b.business_hours, b.qr_code_slug, existing.id);
+      } else {
+        db.prepare(`
+          INSERT INTO branches (id, company_id, code, name, address, phone, business_hours, qr_code_slug, is_active)
+          VALUES (?, 1, ?, ?, ?, ?, ?, ?, 1)
+        `).run(b.id, b.code, b.name, b.address, b.phone, b.business_hours, b.qr_code_slug);
+      }
+    }
+
     // Desactivar servicios antiguos de prueba
     db.prepare("UPDATE services SET is_active = 0 WHERE code IN ('CG', 'CM', 'CE', 'OM')").run();
     // Desactivar módulos antiguos de prueba
