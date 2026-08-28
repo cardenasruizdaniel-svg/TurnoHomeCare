@@ -221,7 +221,7 @@ class SoundService {
   /**
    * Llamado Completo Secuencial: Campana -> Voz 1 -> Pausa -> Campana -> Voz 2 (Sin solapamientos)
    */
-  static announceTicket({ ticketNumber, counterName, template, playSound = true, playVoice = true, volume = 1.0, repetitions = 2 }) {
+  static announceTicket({ ticketNumber, patientName, counterName, template, playSound = true, playVoice = true, volume = 1.0, repetitions = 2 }) {
     this.getAudioContext();
     this.stopAll();
 
@@ -232,10 +232,19 @@ class SoundService {
     if (playVoice) {
       const spokenTicket = this.formatTicketForSpeech(ticketNumber);
       const spokenCounter = counterName || 'su módulo de atención';
+      const cleanPatient = patientName ? patientName.trim() : '';
       
-      const speechText = template
-        ? template.replace('{ticket}', spokenTicket).replace('{counter}', spokenCounter)
-        : `Turno ${spokenTicket}, por favor pasar a ${spokenCounter}`;
+      let speechText = '';
+      if (template) {
+        speechText = template
+          .replace('{ticket}', spokenTicket)
+          .replace('{patient}', cleanPatient ? `, ${cleanPatient}` : '')
+          .replace('{counter}', spokenCounter);
+      } else {
+        speechText = cleanPatient
+          ? `Turno ${spokenTicket}, ${cleanPatient}, por favor pasar a ${spokenCounter}`
+          : `Turno ${spokenTicket}, por favor pasar a ${spokenCounter}`;
+      }
 
       // Esperar 450ms a que termine el primer tono de la campana
       setTimeout(() => {

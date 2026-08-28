@@ -119,6 +119,7 @@ export function PublicDisplayView() {
 
           SoundService.announceTicket({
             ticketNumber: ticket.ticket_number,
+            patientName: ticket.patient_name || '',
             counterName: ticket.counter_name || (ticket.counter_code ? `Consultorio ${ticket.counter_code}` : 'Consultorio'),
             template,
             playSound,
@@ -338,21 +339,38 @@ export function PublicDisplayView() {
             </div>
 
             {/* Número de Turno Gigante */}
-            <div className="text-center my-auto py-4">
+            <div className="text-center my-auto py-3">
               {currentTicket ? (
-                <div className="space-y-4">
+                <div className="space-y-3">
                   <div className={`font-display font-black tracking-tighter transition-all duration-500 ${
                     callingAnimation ? 'text-sky-300 scale-105' : 'text-white'
                   }`}
-                  style={{ fontSize: 'clamp(5rem, 14vw, 11rem)', lineHeight: 0.9 }}>
+                  style={{ fontSize: 'clamp(4.5rem, 12vw, 9.5rem)', lineHeight: 0.9 }}>
                     {currentTicket.ticket_number}
                   </div>
 
-                  <div className="space-y-2 mt-4">
-                    <p className="text-2xl sm:text-4xl font-bold font-display uppercase tracking-wide text-sky-400">
+                  {/* Nombre del Paciente y Cita */}
+                  {currentTicket.patient_name && (
+                    <div className="flex flex-col items-center justify-center gap-1.5 pt-1">
+                      <div className="inline-flex items-center gap-2.5 px-6 py-2 rounded-2xl bg-slate-950/80 border border-slate-700/80 shadow-xl max-w-full">
+                        <span className="text-xs sm:text-sm text-slate-400 font-bold uppercase tracking-wider">Paciente:</span>
+                        <span className="text-xl sm:text-3xl font-black text-white uppercase tracking-tight truncate">
+                          {currentTicket.patient_name}
+                        </span>
+                      </div>
+                      {currentTicket.appointment_time && (
+                        <span className="text-xs sm:text-sm font-black text-teal-300 bg-teal-500/20 px-4 py-1 rounded-full border border-teal-500/40 shadow-md">
+                          ⏰ Cita Programada: {currentTicket.appointment_time}
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="space-y-2 mt-2">
+                    <p className="text-xl sm:text-3xl font-bold font-display uppercase tracking-wide text-sky-400">
                       {currentTicket.service_name}
                     </p>
-                    <div className="inline-flex items-center gap-3 px-6 py-2.5 rounded-2xl bg-slate-950/70 border border-slate-700/80 shadow-lg">
+                    <div className="inline-flex items-center gap-3 px-6 py-2 rounded-2xl bg-slate-950/70 border border-slate-700/80 shadow-lg">
                       <span className="text-sm uppercase font-semibold text-slate-400">Dirigirse a:</span>
                       <span className="text-2xl sm:text-3xl font-extrabold text-emerald-400 uppercase tracking-tight">
                         {currentTicket.counter_name}
@@ -510,13 +528,17 @@ export function PublicDisplayView() {
               recentTickets.map((t, idx) => (
                 <div
                   key={t.id || idx}
-                  className="shrink-0 flex items-center gap-3 px-3.5 py-1.5 rounded-xl bg-slate-950/80 border border-slate-800/80 text-xs shadow-md"
+                  className="shrink-0 flex items-center gap-2.5 px-3.5 py-1.5 rounded-xl bg-slate-950/80 border border-slate-800/80 text-xs shadow-md"
                 >
                   <span className="font-mono font-black text-sm text-white">{t.ticket_number}</span>
-                  <span className="text-slate-600">|</span>
-                  <span className="font-semibold text-slate-300 truncate max-w-[120px]">{t.service_name}</span>
+                  {t.patient_name && (
+                    <>
+                      <span className="text-slate-600">•</span>
+                      <span className="font-bold text-slate-200 truncate max-w-[140px] uppercase">{t.patient_name}</span>
+                    </>
+                  )}
                   <span className="text-slate-600">→</span>
-                  <span className="font-bold text-emerald-400 truncate max-w-[100px]">{t.counter_name}</span>
+                  <span className="font-bold text-emerald-400 truncate max-w-[120px]">{t.counter_name}</span>
                 </div>
               ))
             ) : (

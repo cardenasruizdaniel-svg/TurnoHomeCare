@@ -134,6 +134,7 @@ CREATE TABLE IF NOT EXISTS tickets (
     wait_time_seconds INTEGER DEFAULT 0,
     attention_time_seconds INTEGER DEFAULT 0,
     call_count INTEGER DEFAULT 0,
+    appointment_time TEXT, -- Hora asignada de cita e.g. '10:30' o '08:00'
     notes TEXT,
     FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE,
     FOREIGN KEY (service_id) REFERENCES services(id) ON DELETE RESTRICT,

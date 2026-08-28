@@ -9,6 +9,14 @@ async function initDatabase() {
   const schema = fs.readFileSync(schemaPath, 'utf8');
   
   db.exec(schema);
+
+  // Migraciones incrementales seguras
+  try {
+    db.exec("ALTER TABLE tickets ADD COLUMN appointment_time TEXT;");
+  } catch (e) {
+    // Columna ya existe
+  }
+
   // console.log(' Esquema de base de datos cargado exitosamente.');
 }
 

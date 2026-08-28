@@ -50,7 +50,7 @@ class TicketController {
    */
   static requestTicket(req, res) {
     try {
-      const { branchId = 1, serviceId, patientData } = req.body;
+      const { branchId = 1, serviceId, patientData, appointmentTime = null, targetCounterId = null } = req.body;
 
       if (!serviceId || !patientData || !patientData.documentNumber) {
         return res.status(400).json({
@@ -65,7 +65,9 @@ class TicketController {
         branchId: Number(branchId),
         serviceId: Number(serviceId),
         patientData,
-        ipAddress
+        ipAddress,
+        appointmentTime: appointmentTime || null,
+        targetCounterId: targetCounterId ? Number(targetCounterId) : null
       });
 
       // Si fue creado exitosamente (no duplicado), emitir evento de tiempo real

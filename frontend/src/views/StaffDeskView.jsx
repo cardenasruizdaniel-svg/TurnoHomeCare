@@ -16,7 +16,8 @@ import {
   ArrowRightLeft,
   Send,
   Stethoscope,
-  Printer
+  Printer,
+  Calendar
 } from 'lucide-react';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -37,11 +38,12 @@ export function StaffDeskView() {
 
   const [currentTicket, setCurrentTicket] = useState(null);
   const [waitingTickets, setWaitingTickets] = useState([]);
+  const [agendaTickets, setAgendaTickets] = useState([]);
   const [allBranchWaiting, setAllBranchWaiting] = useState([]);
   const [totalBranchWaiting, setTotalBranchWaiting] = useState(0);
   const [assignedServices, setAssignedServices] = useState([]);
   const [serviceCounts, setServiceCounts] = useState([]);
-  const [queueTab, setQueueTab] = useState('all'); // 'all' | 'module'
+  const [queueTab, setQueueTab] = useState('module'); // 'module' | 'agenda' | 'all'
   const [recommendedTicket, setRecommendedTicket] = useState(null);
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
@@ -58,13 +60,15 @@ export function StaffDeskView() {
   const [targetServiceId, setTargetServiceId] = useState('');
   const [transferNotes, setTransferNotes] = useState('');
 
-  // Modal para Expedir Turno Manual (Adulto Mayor / Sin Celular)
+  // Modal para Expedir Turno Manual (Adulto Mayor / Sin Celular / Cita Programada)
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
   const [manualDoc, setManualDoc] = useState('');
   const [manualName, setManualName] = useState('');
   const [manualAge, setManualAge] = useState('');
   const [manualPhone, setManualPhone] = useState('');
   const [manualServiceId, setManualServiceId] = useState('');
+  const [manualAppointmentTime, setManualAppointmentTime] = useState('');
+  const [manualTargetCounterId, setManualTargetCounterId] = useState('');
   const [manualIsPriority, setManualIsPriority] = useState(false);
   const [manualCheckingDoc, setManualCheckingDoc] = useState(false);
   const [createdManualTicket, setCreatedManualTicket] = useState(null);
@@ -105,6 +109,7 @@ export function StaffDeskView() {
       const res = await api.getWaitingQueue(branchId, selectedCounterId);
       if (res.success) {
         setWaitingTickets(res.waiting_tickets || []);
+        setAgendaTickets(res.agenda_tickets || []);
         setAllBranchWaiting(res.all_branch_waiting || []);
         setTotalBranchWaiting(res.total_branch_waiting || 0);
         setAssignedServices(res.assigned_services || []);
@@ -339,6 +344,8 @@ export function StaffDeskView() {
       const res = await api.requestTicket({
         branchId,
         serviceId: Number(manualServiceId),
+        appointmentTime: manualAppointmentTime || null,
+        targetCounterId: manualTargetCounterId ? Number(manualTargetCounterId) : null,
         patientData: {
           documentNumber: manualDoc.trim(),
           fullName: manualName.trim(),
@@ -355,6 +362,8 @@ export function StaffDeskView() {
         setManualAge('');
         setManualPhone('');
         setManualServiceId('');
+        setManualAppointmentTime('');
+        setManualTargetCounterId('');
         setManualIsPriority(false);
         loadQueueAndStatus();
       }
@@ -793,44 +802,133 @@ export function StaffDeskView() {
             </div>
 
             {/* Queue Filter Tabs */}
-            <div className="grid grid-cols-2 gap-2 bg-slate-950 p-1 rounded-2xl border border-slate-800 text-xs font-bold">
+            <div className="grid grid-cols-3 gap-1.5 bg-slate-950 p-1.5 rounded-2xl border border-slate-800 text-[11px] font-bold">
               <button
                 type="button"
                 onClick={() => setQueueTab('module')}
-                className={`py-2 rounded-xl transition cursor-pointer ${
+                className={`py-2 rounded-xl transition cursor-pointer flex items-center justify-center gap-1 ${
                   queueTab === 'module'
-                    ? 'bg-sky-600 text-white shadow'
+                    ? 'bg-sky-600 text-white shadow-md'
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
-                Mi Puesto ({waitingTickets.length})
+                <Users className="w-3.5 h-3.5" />
+                <span>En Espera ({waitingTickets.length})</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setQueueTab('agenda')}
+                className={`py-2 rounded-xl transition cursor-pointer flex items-center justify-center gap-1 ${
+                  queueTab === 'agenda'
+                    ? 'bg-purple-600 text-white shadow-md'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Calendar className="w-3.5 h-3.5" />
+                <span>Agenda ({agendaTickets.length})</span>
               </button>
               <button
                 type="button"
                 onClick={() => setQueueTab('all')}
-                className={`py-2 rounded-xl transition cursor-pointer ${
+                className={`py-2 rounded-xl transition cursor-pointer flex items-center justify-center gap-1 ${
                   queueTab === 'all'
-                    ? 'bg-sky-600 text-white shadow'
+                    ? 'bg-teal-600 text-white shadow-md'
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
-                Toda la Sede ({totalBranchWaiting})
+                <Building2 className="w-3.5 h-3.5" />
+                <span>Sede ({totalBranchWaiting})</span>
               </button>
             </div>
 
             {/* Notice if module is empty but branch has tickets */}
             {waitingTickets.length === 0 && totalBranchWaiting > 0 && queueTab === 'module' && (
               <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs space-y-1">
-                <p className="font-bold">No hay turnos para tus servicios asignados.</p>
+                <p className="font-bold">No hay turnos en espera para tus servicios asignados.</p>
                 <p className="text-[11px] text-slate-400">
-                  Hay <strong>{totalBranchWaiting}</strong> paciente(s) esperando en otros servicios. Pulsa "Toda la Sede" arriba para ver la fila completa.
+                  Hay <strong>{totalBranchWaiting}</strong> paciente(s) esperando en la sede. Revisa la pestaña <strong>Agenda</strong> o <strong>Sede</strong>.
                 </p>
               </div>
             )}
 
-            {/* Queue List */}
-            <div className="space-y-2 max-h-[520px] overflow-y-auto pr-1">
-              {(queueTab === 'module' ? waitingTickets : allBranchWaiting).length > 0 ? (
+            {/* Queue / Agenda List */}
+            <div className="space-y-2.5 max-h-[520px] overflow-y-auto pr-1">
+              {queueTab === 'agenda' ? (
+                agendaTickets.length > 0 ? (
+                  agendaTickets.map((t) => {
+                    const isCurrent = currentTicket?.id === t.id;
+                    const isWaiting = t.status === 'ESPERANDO';
+                    const isCalled = t.status === 'LLAMADO';
+                    const isInAttention = t.status === 'EN_ATENCION';
+
+                    return (
+                      <div
+                        key={t.id}
+                        className={`p-3.5 rounded-2xl border transition-all flex flex-col gap-2 ${
+                          isCurrent || isCalled || isInAttention
+                            ? 'bg-emerald-950/40 border-emerald-500/60 shadow-lg shadow-emerald-500/10'
+                            : isWaiting
+                              ? 'bg-slate-950/80 border-slate-800 hover:border-purple-500/50'
+                              : 'bg-slate-950/30 border-slate-900 opacity-60'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-mono font-black text-base text-white">{t.ticket_number}</span>
+                            <TypeBadge type={t.ticket_type} />
+                            {t.appointment_time ? (
+                              <span className="px-2 py-0.5 rounded-md bg-teal-500/20 text-teal-300 border border-teal-500/30 text-[10px] font-black">
+                                ⏰ Cita: {t.appointment_time}
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-slate-500 font-medium">Turno Regular</span>
+                            )}
+                          </div>
+                          <StatusBadge status={t.status} />
+                        </div>
+
+                        <div className="flex items-center justify-between pt-1 border-t border-slate-800/60 text-xs">
+                          <div className="space-y-0.5">
+                            <p className="font-bold text-white uppercase">{t.patient_name}</p>
+                            <p className="text-[11px] text-slate-400">CC: {t.document_number} • <strong className="text-sky-400">{t.service_name}</strong></p>
+                          </div>
+
+                          <div className="flex items-center gap-1.5">
+                            {isWaiting && (
+                              <button
+                                type="button"
+                                onClick={() => handleCallNext(t.id)}
+                                disabled={actionLoading}
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-md shadow-purple-600/30 transition cursor-pointer"
+                                title="Llamar o adelantar este paciente ahora"
+                              >
+                                <PhoneCall className="w-3.5 h-3.5" />
+                                <span>Llamar</span>
+                              </button>
+                            )}
+                            {isCalled && (
+                              <button
+                                type="button"
+                                onClick={() => handleStartAttention()}
+                                disabled={actionLoading}
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md shadow-emerald-600/30 transition cursor-pointer"
+                              >
+                                <Play className="w-3.5 h-3.5" />
+                                <span>Atender</span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="py-12 text-center text-xs text-slate-500 space-y-2">
+                    <Calendar className="w-8 h-8 mx-auto text-slate-600" />
+                    <p>No hay citas ni turnos registrados para hoy en este puesto.</p>
+                  </div>
+                )
+              ) : (queueTab === 'module' ? waitingTickets : allBranchWaiting).length > 0 ? (
                 (queueTab === 'module' ? waitingTickets : allBranchWaiting).map((t) => {
                   const isRecommended = recommendedTicket?.id === t.id;
                   const isDirect = t.is_directly_assigned || t.counter_id === selectedCounterId;
@@ -853,9 +951,14 @@ export function StaffDeskView() {
                             {t.ticket_number}
                           </span>
                           <TypeBadge type={t.ticket_type} />
+                          {t.appointment_time && (
+                            <span className="text-[10px] font-black text-teal-300 bg-teal-500/20 px-2 py-0.5 rounded-md border border-teal-500/30">
+                              ⏰ {t.appointment_time}
+                            </span>
+                          )}
                           {isDirect && (
                             <span className="text-[10px] font-black uppercase tracking-wider text-emerald-300 bg-emerald-500/25 border border-emerald-500/40 px-2 py-0.5 rounded-md animate-pulse">
-                              ★ Derivado a este Consultorio
+                              ★ Asignado a Consultorio
                             </span>
                           )}
                           {!isDirect && isRecommended && (
@@ -1017,11 +1120,11 @@ export function StaffDeskView() {
         </form>
       </Modal>
 
-      {/* Modal para Expedir Turno Manual (Adulto Mayor / Pacientes Sin Celular) */}
+      {/* Modal para Expedir Turno Manual (Adulto Mayor / Pacientes Sin Celular / Cita Programada) */}
       <Modal
         isOpen={isManualModalOpen}
         onClose={() => setIsManualModalOpen(false)}
-        title="Expedir Turno Presencial / Adulto Mayor"
+        title="Expedir Turno / Agendar Cita en Consultorio"
       >
         {createdManualTicket ? (
           <div className="space-y-6 text-center">
@@ -1035,6 +1138,16 @@ export function StaffDeskView() {
               <p className="text-sm font-bold text-teal-400 uppercase">
                 {createdManualTicket.service_name}
               </p>
+              {createdManualTicket.appointment_time && (
+                <p className="text-xs font-black text-teal-300 bg-teal-500/15 py-1 px-3 rounded-full border border-teal-500/30 inline-block">
+                  ⏰ Cita Programada: {createdManualTicket.appointment_time}
+                </p>
+              )}
+              {createdManualTicket.counter_name && (
+                <p className="text-xs font-bold text-purple-300">
+                  🏥 Asignado a: {createdManualTicket.counter_name}
+                </p>
+              )}
               <div className="pt-2 border-t border-slate-800 text-xs text-slate-300 space-y-1">
                 <p>Paciente: <strong className="text-white">{createdManualTicket.patient_name}</strong></p>
                 <p>Cédula: <strong className="font-mono text-slate-200">{createdManualTicket.document_number}</strong></p>
@@ -1065,7 +1178,7 @@ export function StaffDeskView() {
         ) : (
           <form onSubmit={handleCreateManualTicket} className="space-y-4 text-xs">
             <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800 text-slate-400 text-[11px] leading-relaxed">
-              Utiliza este formulario para expedir un turno a pacientes de la tercera edad, personas sin teléfono móvil o con dificultades para escanear el código QR.
+              Expide turnos presenciales inmediatos o asigna turnos con hora programada y consultorio de destino para pacientes con cita médica.
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1113,7 +1226,7 @@ export function StaffDeskView() {
                 />
                 {Number(manualAge) >= 60 && (
                   <span className="text-[10px] font-bold text-purple-400 block">
-                    ⭐ Atención Prioritaria Automática (Adulto Mayor $\ge 60$)
+                    ⭐ Atención Prioritaria Automática (Adulto Mayor ≥ 60)
                   </span>
                 )}
               </div>
@@ -1145,6 +1258,37 @@ export function StaffDeskView() {
                   </option>
                 ))}
               </select>
+            </div>
+
+            {/* Agendamiento con Hora y Consultorio Específico */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 rounded-2xl bg-slate-950 border border-slate-800">
+              <div className="space-y-1">
+                <label className="font-bold text-teal-300 block">⏰ Hora Asignada / Cita (Opcional)</label>
+                <input
+                  type="time"
+                  value={manualAppointmentTime}
+                  onChange={(e) => setManualAppointmentTime(e.target.value)}
+                  className="w-full p-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono font-bold focus:outline-none focus:border-teal-500"
+                />
+                <span className="text-[10px] text-slate-500 block">Deja en blanco para turno de sala inmediato</span>
+              </div>
+
+              <div className="space-y-1">
+                <label className="font-bold text-purple-300 block">🏥 Consultorio / Módulo Asignado</label>
+                <select
+                  value={manualTargetCounterId}
+                  onChange={(e) => setManualTargetCounterId(e.target.value)}
+                  className="w-full p-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white font-bold focus:outline-none focus:border-purple-500"
+                >
+                  <option value="">-- Asignación Automática --</option>
+                  {counters.map(c => (
+                    <option key={c.id} value={c.id}>
+                      {c.name} ({c.code})
+                    </option>
+                  ))}
+                </select>
+                <span className="text-[10px] text-slate-500 block">El médico verá el turno en su agenda</span>
+              </div>
             </div>
 
             <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">

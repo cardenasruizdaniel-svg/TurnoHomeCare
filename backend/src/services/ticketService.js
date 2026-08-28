@@ -44,7 +44,7 @@ class TicketService {
   /**
    * Crea un nuevo turno validando duplicados, horarios y reglas de prioridad
    */
-  static createTicket({ branchId = 1, serviceId, patientData, ipAddress = null }) {
+  static createTicket({ branchId = 1, serviceId, patientData, ipAddress = null, appointmentTime = null, targetCounterId = null }) {
     const branch = db.prepare('SELECT * FROM branches WHERE id = ? AND is_active = 1').get(branchId);
     if (!branch) {
       throw new Error('SEDE_NO_ENCONTRADA_O_INACTIVA');
@@ -120,32 +120,41 @@ class TicketService {
 
       const insertStmt = db.prepare(`
         INSERT INTO tickets (
-          ticket_number, branch_id, service_id, patient_id, 
-          ticket_type, status, sequence_number, created_date
-        ) VALUES (?, ?, ?, ?, ?, 'ESPERANDO', ?, ?)
+          ticket_number, branch_id, service_id, patient_id, counter_id,
+          ticket_type, status, sequence_number, created_date, appointment_time
+        ) VALUES (?, ?, ?, ?, ?, ?, 'ESPERANDO', ?, ?, ?)
       `);
 
       const result = insertStmt.run(
-        ticketNumber, branchId, service.id, patient.id,
-        ticketType, nextSequence, today
+        ticketNumber,
+        branchId,
+        service.id,
+        patient.id,
+        targetCounterId ? Number(targetCounterId) : null,
+        ticketType,
+        nextSequence,
+        today,
+        appointmentTime || null
       );
 
       const ticketId = result.lastInsertRowid;
 
       // Registrar evento
       db.prepare(`
-        INSERT INTO ticket_events (ticket_id, from_status, to_status, metadata)
-        VALUES (?, NULL, 'ESPERANDO', ?)
-      `).run(ticketId, JSON.stringify({ ip: ipAddress, age: patient.age, isPriority }));
+        INSERT INTO ticket_events (ticket_id, from_status, to_status, counter_id, metadata)
+        VALUES (?, NULL, 'ESPERANDO', ?, ?)
+      `).run(ticketId, targetCounterId ? Number(targetCounterId) : null, JSON.stringify({ ip: ipAddress, age: patient.age, isPriority, appointmentTime }));
 
       createdTicket = db.prepare(`
         SELECT t.*, s.name as service_name, s.code as service_code, 
                p.full_name as patient_name, p.document_number, p.age as patient_age,
-               b.name as branch_name
+               b.name as branch_name,
+               c.name as counter_name, c.code as counter_code
         FROM tickets t
         JOIN services s ON t.service_id = s.id
         JOIN patients p ON t.patient_id = p.id
         JOIN branches b ON t.branch_id = b.id
+        LEFT JOIN counters c ON t.counter_id = c.id
         WHERE t.id = ?
       `).get(ticketId);
     });
@@ -657,10 +666,12 @@ class TicketService {
     // Turno actualmente en llamado o atención más reciente
     const currentTicket = db.prepare(`
       SELECT t.*, s.name as service_name, s.code as service_code,
-             c.name as counter_name, c.code as counter_code
+             c.name as counter_name, c.code as counter_code,
+             p.full_name as patient_name, p.document_number
       FROM tickets t
       JOIN services s ON t.service_id = s.id
       JOIN counters c ON t.counter_id = c.id
+      JOIN patients p ON t.patient_id = p.id
       WHERE t.branch_id = ? 
         AND t.status IN ('LLAMADO', 'EN_ATENCION')
       ORDER BY t.called_at DESC LIMIT 1
@@ -669,10 +680,12 @@ class TicketService {
     // Historial de últimos turnos llamados
     const recentTickets = db.prepare(`
       SELECT t.*, s.name as service_name, s.code as service_code,
-             c.name as counter_name, c.code as counter_code
+             c.name as counter_name, c.code as counter_code,
+             p.full_name as patient_name, p.document_number
       FROM tickets t
       JOIN services s ON t.service_id = s.id
       JOIN counters c ON t.counter_id = c.id
+      JOIN patients p ON t.patient_id = p.id
       WHERE t.branch_id = ?
         AND t.status IN ('LLAMADO', 'EN_ATENCION', 'FINALIZADO', 'NO_PRESENTO')
         AND (? IS NULL OR t.id != ?)
@@ -698,7 +711,7 @@ class TicketService {
   }
 
   /**
-   * Obtiene la cola de espera activa para la sede o módulo
+   * Obtiene la cola de espera activa para la sede o módulo y la agenda del día
    */
   static getWaitingQueue(branchId = 1, counterId = null) {
     let counterFilter = '';
@@ -725,30 +738,74 @@ class TicketService {
       }
     }
 
-    // Turnos asignados específicamente a este módulo
+    // Turnos asignados específicamente a este módulo en estado ESPERANDO
     const waiting = db.prepare(`
-      SELECT t.*, s.name as service_name, s.letter_prefix,
-             p.full_name as patient_name, p.document_number, p.age as patient_age
+      SELECT t.*, s.name as service_name, s.letter_prefix, s.code as service_code,
+             p.full_name as patient_name, p.document_number, p.age as patient_age, p.phone as patient_phone,
+             c.name as counter_name, c.code as counter_code
       FROM tickets t
       JOIN services s ON t.service_id = s.id
       JOIN patients p ON t.patient_id = p.id
+      LEFT JOIN counters c ON t.counter_id = c.id
       WHERE t.branch_id = ?
         AND t.status = 'ESPERANDO'
         ${counterFilter}
-      ORDER BY t.created_at ASC
+      ORDER BY 
+        CASE 
+          WHEN t.appointment_time IS NOT NULL AND t.appointment_time != '' THEN t.appointment_time 
+          ELSE '99:99' 
+        END ASC,
+        t.created_at ASC
     `).all(...params);
 
     // Todos los turnos en espera de la sede (para visibilidad global)
     const allBranchWaiting = db.prepare(`
-      SELECT t.*, s.name as service_name, s.letter_prefix,
-             p.full_name as patient_name, p.document_number, p.age as patient_age
+      SELECT t.*, s.name as service_name, s.letter_prefix, s.code as service_code,
+             p.full_name as patient_name, p.document_number, p.age as patient_age, p.phone as patient_phone,
+             c.name as counter_name, c.code as counter_code
       FROM tickets t
       JOIN services s ON t.service_id = s.id
       JOIN patients p ON t.patient_id = p.id
+      LEFT JOIN counters c ON t.counter_id = c.id
       WHERE t.branch_id = ?
         AND t.status = 'ESPERANDO'
       ORDER BY t.created_at ASC
     `).all(branchId);
+
+    // Agenda completa del día para el médico / consultorio (incluye todos los estados)
+    let agendaTickets = [];
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const today = `${year}-${month}-${day}`;
+
+    if (counterId) {
+      agendaTickets = db.prepare(`
+        SELECT t.*, s.name as service_name, s.letter_prefix, s.code as service_code,
+               c.name as counter_name, c.code as counter_code,
+               p.full_name as patient_name, p.document_number, p.age as patient_age, p.phone as patient_phone
+        FROM tickets t
+        JOIN services s ON t.service_id = s.id
+        JOIN patients p ON t.patient_id = p.id
+        LEFT JOIN counters c ON t.counter_id = c.id
+        WHERE t.branch_id = ?
+          AND (t.created_date = ? OR date(t.created_at, 'localtime') = ?)
+          ${counterFilter}
+        ORDER BY 
+          CASE 
+            WHEN t.status = 'EN_ATENCION' THEN 1
+            WHEN t.status = 'LLAMADO' THEN 2
+            WHEN t.status = 'ESPERANDO' THEN 3
+            ELSE 4
+          END,
+          CASE 
+            WHEN t.appointment_time IS NOT NULL AND t.appointment_time != '' THEN t.appointment_time 
+            ELSE '99:99' 
+          END ASC,
+          t.created_at ASC
+      `).all(branchId, today, today, ...params.slice(1));
+    }
 
     // Turno actualmente en atención o llamado en ESTE puesto/módulo
     let counterActiveTicket = null;
@@ -781,6 +838,7 @@ class TicketService {
       counter_active_ticket: counterActiveTicket || null,
       waiting_tickets: waiting,
       total_waiting: waiting.length,
+      agenda_tickets: agendaTickets || [],
       all_branch_waiting: allBranchWaiting,
       total_branch_waiting: allBranchWaiting.length,
       assigned_services: assignedServiceNames,
