@@ -89,7 +89,10 @@ export const api = {
   getSettings: () => request('/settings'),
   updateSettings: (payload) => request('/settings', { method: 'POST', body: JSON.stringify(payload) }),
   resetDailyQueue: (branchId) => request('/settings/reset-daily-queue', { method: 'POST', body: JSON.stringify({ branchId }) }),
-  getBackupDownloadUrl: () => `${API_BASE}/settings/backup/download?token=${localStorage.getItem('deaturnos_token') || ''}`,
+  getBackupDownloadUrl: () => `${API_BASE}/settings/backup/download`,
+  getBackupExportJsonUrl: () => `${API_BASE}/settings/backup/export-json`,
+  exportJsonBackup: () => request('/settings/backup/export-json'),
+  importJsonBackup: (backupData) => request('/settings/backup/import-json', { method: 'POST', body: JSON.stringify({ backupData }) }),
   createBackupSnapshot: () => request('/settings/backup/create', { method: 'POST' }),
 
   // Túnel de Acceso Público (4G/5G)

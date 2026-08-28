@@ -94,6 +94,8 @@ router.get('/settings', SettingsController.getAll);
 router.post('/settings', authenticateToken, requireRole(['ADMIN']), SettingsController.updateBatch);
 router.post('/settings/reset-daily-queue', authenticateToken, requireRole(['ADMIN']), SettingsController.resetDailyQueue);
 router.get('/settings/backup/download', authenticateToken, requireRole(['ADMIN']), SettingsController.downloadBackup);
+router.get('/settings/backup/export-json', authenticateToken, requireRole(['ADMIN']), SettingsController.exportJsonBackup);
+router.post('/settings/backup/import-json', authenticateToken, requireRole(['ADMIN']), SettingsController.importJsonBackup);
 router.post('/settings/backup/create', authenticateToken, requireRole(['ADMIN']), SettingsController.createBackupSnapshot);
 
 // Auditoría

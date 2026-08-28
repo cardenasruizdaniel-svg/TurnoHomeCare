@@ -170,16 +170,10 @@ const officialCounters = [
 
 async function syncServicesAndCounters() {
   try {
-    // 0. Sincronizar Sedes Oficiales HomeCare
+    // 0. Sincronizar Sedes Oficiales HomeCare (Únicamente si no existen)
     for (const b of officialBranches) {
       const existing = db.prepare("SELECT id FROM branches WHERE id = ? OR code = ?").get(b.id, b.code);
-      if (existing) {
-        db.prepare(`
-          UPDATE branches
-          SET code = ?, name = ?, address = ?, phone = ?, business_hours = ?, qr_code_slug = ?, is_active = 1, updated_at = CURRENT_TIMESTAMP
-          WHERE id = ?
-        `).run(b.code, b.name, b.address, b.phone, b.business_hours, b.qr_code_slug, existing.id);
-      } else {
+      if (!existing) {
         db.prepare(`
           INSERT INTO branches (id, company_id, code, name, address, phone, business_hours, qr_code_slug, is_active)
           VALUES (?, 1, ?, ?, ?, ?, ?, ?, 1)
@@ -187,28 +181,19 @@ async function syncServicesAndCounters() {
       }
     }
 
-    // Desactivar servicios antiguos de prueba
-    db.prepare("UPDATE services SET is_active = 0 WHERE code IN ('CG', 'CM', 'CE', 'OM')").run();
-    // Desactivar módulos antiguos de prueba
-    db.prepare("UPDATE counters SET is_active = 0 WHERE code IN ('CONS-2', 'CONS-3')").run();
-
+    // 1. Insertar servicios oficiales únicamente si la tabla está vacía o el servicio no existe
     for (const s of officialServices) {
       const existing = db.prepare("SELECT id FROM services WHERE code = ?").get(s.code);
-      if (existing) {
-        db.prepare("UPDATE services SET name = ?, description = ?, letter_prefix = ?, priority_prefix = ?, estimated_minutes = ?, order_index = ?, is_active = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
-          .run(s.name, s.description, s.letter_prefix, s.priority_prefix, s.estimated_minutes, s.order_index, existing.id);
-      } else {
+      if (!existing) {
         db.prepare("INSERT INTO services (company_id, code, name, description, letter_prefix, priority_prefix, estimated_minutes, is_active, order_index) VALUES (1, ?, ?, ?, ?, ?, ?, 1, ?)")
           .run(s.code, s.name, s.description, s.letter_prefix, s.priority_prefix, s.estimated_minutes, s.order_index);
       }
     }
 
+    // 2. Insertar consultorios/módulos oficiales únicamente si no existen
     for (const c of officialCounters) {
       const existing = db.prepare("SELECT id FROM counters WHERE code = ?").get(c.code);
-      if (existing) {
-        db.prepare("UPDATE counters SET name = ?, is_active = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
-          .run(c.name, existing.id);
-      } else {
+      if (!existing) {
         db.prepare("INSERT INTO counters (branch_id, code, name, is_active) VALUES (1, ?, ?, 1)")
           .run(c.code, c.name);
       }
@@ -252,61 +237,58 @@ async function syncServicesAndCounters() {
       });
     }
 
-    // 4. Actualizar Banners Oficiales de HomeCare en la tabla de configuraciones
-    const officialBanners = [
-      {
-        id: "b1",
-        title: "Clínica de Heridas & Cuidadoras",
-        subtitle: "Atención especializada en heridas y asistencia personalizada con calidez humana en casa.",
-        tag: "Atención Domiciliaria",
-        imageUrl: "/banners/banner_heridas_cuidadoras.png",
-        isActive: true
-      },
-      {
-        id: "b2",
-        title: "Pedagogía Infantil & Toma de Muestras",
-        subtitle: "Educación adaptada a tus hijos y laboratorio clínico en la comodidad de tu hogar.",
-        tag: "Salud y Educación",
-        imageUrl: "/banners/banner_pedagogia_muestras.png",
-        isActive: true
-      },
-      {
-        id: "b3",
-        title: "Psicología, Nutrición y Dietética",
-        subtitle: "Terapia emocional, manejo del estrés y planes alimenticios saludables para toda la familia.",
-        tag: "Bienestar Integral",
-        imageUrl: "/banners/banner_psicologia_nutricion.png",
-        isActive: true
-      },
-      {
-        id: "b4",
-        title: "Fonoaudiología & Fisioterapia",
-        subtitle: "Terapia del lenguaje, deglución y rehabilitación física integral en el hogar.",
-        tag: "Rehabilitación en Casa",
-        imageUrl: "/banners/banner_fono_fisioterapia.png",
-        isActive: true
-      },
-      {
-        id: "b5",
-        title: "Terapia Ocupacional & Terapia Respiratoria",
-        subtitle: "Desarrollo cognitivo y motor, junto a cuidado respiratorio especializado domiciliario.",
-        tag: "Terapia Especializada",
-        imageUrl: "/banners/banner_ocupacional_respiratoria.png",
-        isActive: true
-      }
-    ];
-
+    // 4. Banners Oficiales Iniciales (SOLO si no existen previamente en la base de datos)
     const bannerSetting = db.prepare("SELECT id FROM settings WHERE key = 'BANNERS_PUBLICIDAD' AND branch_id IS NULL").get();
-    if (bannerSetting) {
-      db.prepare("UPDATE settings SET value = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
-        .run(JSON.stringify(officialBanners), bannerSetting.id);
-    } else {
+    if (!bannerSetting) {
+      const officialBanners = [
+        {
+          id: "b1",
+          title: "Clínica de Heridas & Cuidadoras",
+          subtitle: "Atención especializada en heridas y asistencia personalizada con calidez humana en casa.",
+          tag: "Atención Domiciliaria",
+          imageUrl: "/banners/banner_heridas_cuidadoras.png",
+          isActive: true
+        },
+        {
+          id: "b2",
+          title: "Pedagogía Infantil & Toma de Muestras",
+          subtitle: "Educación adaptada a tus hijos y laboratorio clínico en la comodidad de tu hogar.",
+          tag: "Salud y Educación",
+          imageUrl: "/banners/banner_pedagogia_muestras.png",
+          isActive: true
+        },
+        {
+          id: "b3",
+          title: "Psicología, Nutrición y Dietética",
+          subtitle: "Terapia emocional, manejo del estrés y planes alimenticios saludables para toda la familia.",
+          tag: "Bienestar Integral",
+          imageUrl: "/banners/banner_psicologia_nutricion.png",
+          isActive: true
+        },
+        {
+          id: "b4",
+          title: "Fonoaudiología & Fisioterapia",
+          subtitle: "Terapia del lenguaje, deglución y rehabilitación física integral en el hogar.",
+          tag: "Rehabilitación en Casa",
+          imageUrl: "/banners/banner_fono_fisioterapia.png",
+          isActive: true
+        },
+        {
+          id: "b5",
+          title: "Terapia Ocupacional & Terapia Respiratoria",
+          subtitle: "Desarrollo cognitivo y motor, junto a cuidado respiratorio especializado domiciliario.",
+          tag: "Terapia Especializada",
+          imageUrl: "/banners/banner_ocupacional_respiratoria.png",
+          isActive: true
+        }
+      ];
+
       db.prepare("INSERT INTO settings (branch_id, key, value, description, data_type) VALUES (NULL, 'BANNERS_PUBLICIDAD', ?, 'Banners multimedia rotativos en pantalla de TV', 'json')")
         .run(JSON.stringify(officialBanners));
     }
 
     if (db.persistToDisk) db.persistToDisk();
-    console.log("Servicios, Modulos y Banners oficiales HomeCare del Quindio sincronizados exitosamente.");
+    console.log("Verificación de datos iniciales completada (datos de usuario preservados).");
   } catch (err) {
     console.error("Error sincronizando servicios y modulos:", err);
   }

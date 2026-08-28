@@ -255,6 +255,53 @@ export function AdminSettingsView() {
     window.open(api.getBackupDownloadUrl(), '_blank');
   };
 
+  const handleExportJsonBackup = async () => {
+    try {
+      setBackupLoading(true);
+      const res = await api.exportJsonBackup();
+      const blob = new Blob([JSON.stringify(res, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `deaturnos_respaldo_${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setSuccessMsg('Copia de respaldo JSON descargada exitosamente.');
+    } catch (e) {
+      setErrorMsg('Error al exportar respaldo: ' + e.message);
+    } finally {
+      setBackupLoading(false);
+    }
+  };
+
+  const handleImportJsonBackup = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        setBackupLoading(true);
+        const content = event.target.result;
+        const parsed = JSON.parse(content);
+        const res = await api.importJsonBackup(parsed);
+        if (res.success) {
+          setSuccessMsg('¡Respaldo importado y restaurado exitosamente! Recargando datos...');
+          setTimeout(() => {
+            window.location.reload();
+          }, 1500);
+        } else {
+          setErrorMsg(res.error || 'Error al restaurar respaldo.');
+        }
+      } catch (err) {
+        setErrorMsg('El archivo de respaldo es inválido o está corrupto: ' + err.message);
+      } finally {
+        setBackupLoading(false);
+      }
+    };
+    reader.readAsText(file);
+  };
+
   const handleAddBanner = () => {
     const newBanner = {
       id: 'b_' + Date.now(),
@@ -1157,49 +1204,89 @@ export function AdminSettingsView() {
               </span>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
-                <div className="flex items-center gap-2 text-slate-200 font-bold">
-                  <Database className="w-4 h-4 text-sky-400" />
-                  <span>Política de Actualizaciones Seguras</span>
-                </div>
-                <p className="text-slate-400 leading-relaxed text-[11px]">
-                  Todas las actualizaciones del sistema se ejecutan como <strong>mejoras puramente aditivas</strong>. El sistema nunca borra ni trunca pacientes, turnos, banners ni configuraciones al subir nuevas versiones.
-                </p>
-              </div>
-
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+              
+              {/* Tarjeta 1: Exportar Respaldo JSON Portátil */}
               <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3 flex flex-col justify-between">
                 <div>
-                  <div className="flex items-center gap-2 text-slate-200 font-bold">
-                    <Download className="w-4 h-4 text-emerald-400" />
-                    <span>Descarga Directa de Respaldo (.db)</span>
+                  <div className="flex items-center gap-2 text-sky-300 font-bold">
+                    <Download className="w-4 h-4 text-sky-400" />
+                    <span>Exportar Respaldo (.json)</span>
                   </div>
-                  <p className="text-slate-400 text-[11px] mt-1">
-                    Descarga una copia exacta y completa de la base de datos SQLite con todos los registros actuales.
+                  <p className="text-slate-400 text-[11px] mt-1 leading-relaxed">
+                    Descarga todas tus sedes, módulos, servicios, fotos de banners y configuraciones en formato JSON portátil compatible con cualquier servidor.
                   </p>
                 </div>
 
-                <div className="flex flex-wrap gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={handleExportJsonBackup}
+                  disabled={backupLoading}
+                  className="w-full py-2.5 px-4 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs shadow-lg shadow-sky-600/20 transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>{backupLoading ? 'Exportando...' : 'Descargar Respaldo JSON'}</span>
+                </button>
+              </div>
+
+              {/* Tarjeta 2: Restaurar Respaldo JSON */}
+              <div className="p-4 rounded-2xl bg-slate-950 border border-purple-500/30 space-y-3 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center gap-2 text-purple-300 font-bold">
+                    <Upload className="w-4 h-4 text-purple-400" />
+                    <span>Restaurar desde Respaldo (.json)</span>
+                  </div>
+                  <p className="text-slate-400 text-[11px] mt-1 leading-relaxed">
+                    Restaura instantáneamente todas tus configuraciones, imágenes y servicios subiendo tu archivo de copia de seguridad.
+                  </p>
+                </div>
+
+                <label className="w-full py-2.5 px-4 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-lg shadow-purple-600/20 transition flex items-center justify-center gap-2 cursor-pointer text-center">
+                  <Upload className="w-4 h-4" />
+                  <span>Subir y Restaurar Respaldo</span>
+                  <input
+                    type="file"
+                    accept=".json"
+                    onChange={handleImportJsonBackup}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+
+              {/* Tarjeta 3: Descarga SQLite Cruda (.db) */}
+              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center gap-2 text-emerald-300 font-bold">
+                    <Database className="w-4 h-4 text-emerald-400" />
+                    <span>Base de Datos SQLite (.db)</span>
+                  </div>
+                  <p className="text-slate-400 text-[11px] mt-1 leading-relaxed">
+                    Copia exacta del archivo físico binario de base de datos para servidores locales o copias de seguridad de bajo nivel.
+                  </p>
+                </div>
+
+                <div className="flex flex-col gap-2">
                   <button
                     type="button"
                     onClick={handleDownloadBackup}
-                    className="flex-1 py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/20 transition flex items-center justify-center gap-2 cursor-pointer"
+                    className="w-full py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/20 transition flex items-center justify-center gap-2 cursor-pointer"
                   >
-                    <Download className="w-4 h-4" />
-                    <span>Descargar Base de Datos (.db)</span>
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Descargar Archivo .db</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={handleCreateSnapshot}
                     disabled={backupLoading}
-                    className="py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-bold text-xs transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                    className="w-full py-1.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-bold text-[11px] transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
                   >
-                    <Save className="w-4 h-4" />
-                    <span>{backupLoading ? 'Creando...' : 'Crear Punto Snapshot'}</span>
+                    <Save className="w-3.5 h-3.5" />
+                    <span>{backupLoading ? 'Guardando...' : 'Crear Snapshot en Disco'}</span>
                   </button>
                 </div>
               </div>
+
             </div>
 
           </div>

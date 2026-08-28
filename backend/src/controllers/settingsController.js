@@ -79,7 +79,7 @@ class SettingsController {
   static downloadBackup(req, res) {
     try {
       const BackupService = require('../services/backupService');
-      const buffer = BackupService.getBackupBuffer();
+      const buffer = BackupService.getDatabaseBuffer();
       if (!buffer) {
         return res.status(404).json({ success: false, error: 'NO_DATABASE_FILE' });
       }
@@ -93,14 +93,44 @@ class SettingsController {
     }
   }
 
+  static exportJsonBackup(req, res) {
+    try {
+      const BackupService = require('../services/backupService');
+      const data = BackupService.exportFullDataJson();
+      const today = new Date().toISOString().slice(0, 10);
+      res.setHeader('Content-Disposition', `attachment; filename="deaturnos_full_backup_${today}.json"`);
+      res.setHeader('Content-Type', 'application/json');
+      res.send(JSON.stringify(data, null, 2));
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
+  static importJsonBackup(req, res) {
+    try {
+      const BackupService = require('../services/backupService');
+      const { backupData } = req.body;
+      if (!backupData) {
+        return res.status(400).json({ success: false, error: 'DATOS_REQUERIDOS', message: 'Debe adjuntar los datos del respaldo.' });
+      }
+
+      const parsedData = typeof backupData === 'string' ? JSON.parse(backupData) : backupData;
+      BackupService.importFullDataJson(parsedData);
+      res.json({ success: true, message: 'Base de datos y configuraciones restauradas exitosamente desde el respaldo.' });
+    } catch (err) {
+      console.error('Error importando respaldo JSON:', err);
+      res.status(400).json({ success: false, error: err.message });
+    }
+  }
+
   static createBackupSnapshot(req, res) {
     try {
       const BackupService = require('../services/backupService');
-      const backupPath = BackupService.createBackup();
-      if (!backupPath) {
+      const backupInfo = BackupService.createBackup();
+      if (!backupInfo) {
         return res.status(500).json({ success: false, error: 'ERROR_CREATING_BACKUP' });
       }
-      res.json({ success: true, message: 'Copia de respaldo generada exitosamente en disco.', path: backupPath });
+      res.json({ success: true, message: 'Copia de respaldo generada exitosamente en disco.', backup: backupInfo });
     } catch (err) {
       res.status(500).json({ success: false, error: err.message });
     }
