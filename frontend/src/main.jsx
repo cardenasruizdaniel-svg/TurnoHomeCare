@@ -6,17 +6,20 @@ import './index.css';
 import { AuthProvider } from './context/AuthContext.jsx';
 import { SocketProvider } from './context/SocketContext.jsx';
 import { BrandingProvider } from './context/BrandingContext.jsx';
+import { ThemeProvider } from './context/ThemeContext.jsx';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <BrowserRouter>
-      <BrandingProvider>
-        <AuthProvider>
-          <SocketProvider>
-            <App />
-          </SocketProvider>
-        </AuthProvider>
-      </BrandingProvider>
+      <ThemeProvider>
+        <BrandingProvider>
+          <AuthProvider>
+            <SocketProvider>
+              <App />
+            </SocketProvider>
+          </AuthProvider>
+        </BrandingProvider>
+      </ThemeProvider>
     </BrowserRouter>
   </React.StrictMode>,
 );

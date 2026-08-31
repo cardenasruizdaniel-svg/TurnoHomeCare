@@ -18,6 +18,7 @@ import { AdminSettingsView } from './views/admin/AdminSettingsView';
 import { AdminReportsView } from './views/admin/AdminReportsView';
 import { AdminAuditView } from './views/admin/AdminAuditView';
 import { useAuth } from './context/AuthContext';
+import { useTheme } from './context/ThemeContext';
 
 function ProtectedStaffRoute({ children }) {
   const { user, loading } = useAuth();
@@ -27,25 +28,22 @@ function ProtectedStaffRoute({ children }) {
 }
 
 export function App() {
+  const { isDark } = useTheme();
+
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans antialiased">
+    <div className={`min-h-screen flex flex-col font-sans antialiased transition-colors duration-300 ${
+      isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-100 text-slate-900'
+    }`}>
       <Navbar />
       <div className="flex-1">
         <Routes>
-          {/* Vistas Públicas */}
           <Route path="/" element={<HomeView />} />
           <Route path="/solicitar-turno" element={<RequestTicketView />} />
           <Route path="/turno/:branchId" element={<RequestTicketView />} />
           <Route path="/mi-turno/:id" element={<MyTicketView />} />
-          
-          {/* Pantalla Pública TV */}
           <Route path="/pantalla" element={<PublicDisplayView />} />
           <Route path="/tv/:branchId" element={<PublicDisplayView />} />
-
-          {/* Autenticación */}
           <Route path="/login" element={<LoginView />} />
-
-          {/* Panel de Funcionario / Ventanilla */}
           <Route
             path="/atencion"
             element={
@@ -54,23 +52,18 @@ export function App() {
               </ProtectedStaffRoute>
             }
           />
-
-          {/* Módulo de Administración */}
           <Route path="/admin" element={<AdminLayout />}>
             <Route index element={<Navigate to="/admin/dashboard" replace />} />
-            <Route path="dashboard" element={<AdminDashboardView />} />
-            <Route path="turnos" element={<AdminTicketsView />} />
-            <Route path="servicios" element={<AdminServicesView />} />
-            <Route path="modulos" element={<AdminCountersView />} />
-            <Route path="sedes" element={<AdminBranchesView />} />
-            <Route path="usuarios" element={<AdminUsersView />} />
+            <Route path="dashboard"     element={<AdminDashboardView />} />
+            <Route path="turnos"        element={<AdminTicketsView />} />
+            <Route path="servicios"     element={<AdminServicesView />} />
+            <Route path="modulos"       element={<AdminCountersView />} />
+            <Route path="sedes"         element={<AdminBranchesView />} />
+            <Route path="usuarios"      element={<AdminUsersView />} />
             <Route path="configuracion" element={<AdminSettingsView />} />
-            <Route path="settings" element={<AdminSettingsView />} />
-            <Route path="reportes" element={<AdminReportsView />} />
-            <Route path="auditoria" element={<AdminAuditView />} />
+            <Route path="reportes"      element={<AdminReportsView />} />
+            <Route path="auditoria"     element={<AdminAuditView />} />
           </Route>
-
-          {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </div>

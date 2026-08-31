@@ -1,17 +1,19 @@
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Tv, QrCode, UserCheck, ShieldCheck, LogOut, Activity, User } from 'lucide-react';
+import { Tv, QrCode, UserCheck, ShieldCheck, LogOut, Activity, User, Sun, Moon } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useBranding } from '../context/BrandingContext';
+import { useTheme } from '../context/ThemeContext';
 
 export function Navbar() {
   const { user, logout, isFuncionario, isAdmin } = useAuth();
   const { company } = useBranding();
+  const { isDark, toggleTheme } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
 
   const isPublicScreen = location.pathname.startsWith('/pantalla') || location.pathname.startsWith('/tv');
-  if (isPublicScreen) return null; // La pantalla de TV es fullscreen
+  if (isPublicScreen) return null;
 
   const handleLogout = () => {
     logout();
@@ -19,7 +21,11 @@ export function Navbar() {
   };
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-xl">
+    <header className={`sticky top-0 z-40 w-full border-b backdrop-blur-xl transition-colors duration-300 ${
+      isDark
+        ? 'border-slate-800/80 bg-slate-950/85'
+        : 'border-slate-200 bg-white/95 shadow-sm'
+    }`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         
         {/* Brand */}
@@ -34,19 +40,25 @@ export function Navbar() {
             </div>
           )}
           <div>
-            <span className="text-sm font-bold font-display tracking-tight text-white flex items-center gap-1.5">
+            <span className={`text-sm font-bold font-display tracking-tight flex items-center gap-1.5 ${
+              isDark ? 'text-white' : 'text-slate-900'
+            }`}>
               {company.name}
             </span>
-            <p className="text-[10px] text-teal-400 font-medium truncate max-w-[200px] sm:max-w-xs">{company.slogan || 'Bienestar en casa.'}</p>
+            <p className="text-[10px] text-teal-500 font-medium truncate max-w-[200px] sm:max-w-xs">{company.slogan || 'Bienestar en casa.'}</p>
           </div>
         </Link>
 
-        {/* Center / Navigation Quick Links */}
+        {/* Center Nav */}
         <nav className="hidden md:flex items-center gap-1">
           <Link
             to="/pantalla"
             target="_blank"
-            className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-900 border border-transparent hover:border-slate-800 transition"
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold border border-transparent transition ${
+              isDark
+                ? 'text-slate-300 hover:text-white hover:bg-slate-900 hover:border-slate-800'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 hover:border-slate-200'
+            }`}
           >
             <Tv className="w-4 h-4 text-sky-400" />
             Pantalla TV
@@ -54,7 +66,11 @@ export function Navbar() {
 
           <Link
             to="/solicitar-turno"
-            className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-900 border border-transparent hover:border-slate-800 transition"
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold border border-transparent transition ${
+              isDark
+                ? 'text-slate-300 hover:text-white hover:bg-slate-900 hover:border-slate-800'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 hover:border-slate-200'
+            }`}
           >
             <QrCode className="w-4 h-4 text-purple-400" />
             Solicitar Turno (QR)
@@ -63,13 +79,15 @@ export function Navbar() {
           {user && (
             <Link
               to="/atencion"
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition ${
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition border ${
                 location.pathname === '/atencion'
-                  ? 'bg-sky-500/20 text-sky-300 border border-sky-500/30'
-                  : 'text-slate-300 hover:text-white hover:bg-slate-900 border border-transparent'
+                  ? 'bg-sky-500/20 text-sky-600 dark:text-sky-300 border-sky-500/30'
+                  : isDark
+                  ? 'text-slate-300 hover:text-white hover:bg-slate-900 border-transparent'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 border-transparent'
               }`}
             >
-              <UserCheck className="w-4 h-4 text-emerald-400" />
+              <UserCheck className="w-4 h-4 text-emerald-500" />
               Panel de Atención
             </Link>
           )}
@@ -77,30 +95,49 @@ export function Navbar() {
           {isAdmin && (
             <Link
               to="/admin/dashboard"
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition ${
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition border ${
                 location.pathname.startsWith('/admin')
-                  ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
-                  : 'text-slate-300 hover:text-white hover:bg-slate-900 border border-transparent'
+                  ? 'bg-indigo-500/20 text-indigo-600 dark:text-indigo-300 border-indigo-500/30'
+                  : isDark
+                  ? 'text-slate-300 hover:text-white hover:bg-slate-900 border-transparent'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 border-transparent'
               }`}
             >
-              <ShieldCheck className="w-4 h-4 text-indigo-400" />
+              <ShieldCheck className="w-4 h-4 text-indigo-500" />
               Administración
             </Link>
           )}
         </nav>
 
-        {/* User profile / Actions */}
-        <div className="flex items-center gap-3">
+        {/* Right: Theme + User */}
+        <div className="flex items-center gap-2">
+          {/* Theme Toggle */}
+          <button
+            onClick={toggleTheme}
+            title={isDark ? 'Activar modo claro' : 'Activar modo oscuro'}
+            className={`p-2.5 rounded-xl border font-semibold transition-all duration-300 ${
+              isDark
+                ? 'bg-slate-900 border-slate-700 text-amber-400 hover:bg-amber-500/10 hover:border-amber-500/40 hover:text-amber-300'
+                : 'bg-white border-slate-200 text-slate-500 hover:bg-indigo-50 hover:border-indigo-300 hover:text-indigo-600 shadow-sm'
+            }`}
+          >
+            {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+          </button>
+
           {user ? (
             <div className="flex items-center gap-3">
               <div className="hidden sm:block text-right">
-                <p className="text-xs font-bold text-white">{user.full_name}</p>
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-sky-400">{user.role}</p>
+                <p className={`text-xs font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{user.full_name}</p>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-sky-500">{user.role}</p>
               </div>
               <button
                 onClick={handleLogout}
                 title="Cerrar Sesión"
-                className="p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-rose-400 hover:border-rose-500/30 hover:bg-rose-500/10 transition"
+                className={`p-2 rounded-xl border transition ${
+                  isDark
+                    ? 'bg-slate-900 border-slate-800 text-slate-400 hover:text-rose-400 hover:border-rose-500/30 hover:bg-rose-500/10'
+                    : 'bg-white border-slate-200 text-slate-500 hover:text-rose-600 hover:border-rose-300 hover:bg-rose-50'
+                }`}
               >
                 <LogOut className="w-4 h-4" />
               </button>
