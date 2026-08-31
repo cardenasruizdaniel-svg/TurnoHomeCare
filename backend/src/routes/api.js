@@ -88,6 +88,9 @@ router.get('/users', authenticateToken, requireRole(['ADMIN', 'SUPERVISOR']), Us
 router.get('/roles', authenticateToken, requireRole(['ADMIN']), UserController.getRoles);
 router.post('/users', authenticateToken, requireRole(['ADMIN']), UserController.create);
 router.put('/users/:id', authenticateToken, requireRole(['ADMIN']), UserController.update);
+router.patch('/users/:id/toggle', authenticateToken, requireRole(['ADMIN']), UserController.toggleActive);
+router.get('/users/:id/movements', authenticateToken, requireRole(['ADMIN']), UserController.checkMovements);
+router.delete('/users/:id', authenticateToken, requireRole(['ADMIN']), UserController.delete);
 
 // Configuraciones del Sistema y Copias de Seguridad
 router.get('/settings', SettingsController.getAll);

@@ -84,6 +84,9 @@ export const api = {
   getRoles: () => request('/roles'),
   createUser: (data) => request('/users', { method: 'POST', body: JSON.stringify(data) }),
   updateUser: (id, data) => request(`/users/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  toggleUserActive: (id) => request(`/users/${id}/toggle`, { method: 'PATCH' }),
+  deleteUser: (id) => request(`/users/${id}`, { method: 'DELETE' }),
+  checkUserMovements: (id) => request(`/users/${id}/movements`),
 
   // Configuración y Copias de Seguridad
   getSettings: () => request('/settings'),

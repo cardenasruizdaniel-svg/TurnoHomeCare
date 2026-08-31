@@ -115,6 +115,119 @@ class UserController {
       res.status(400).json({ success: false, error: err.message });
     }
   }
+
+  static toggleActive(req, res) {
+    try {
+      const { id } = req.params;
+      const userId = Number(id);
+
+      if (req.user.id === userId) {
+        return res.status(400).json({
+          success: false,
+          error: 'NO_AUTOINACTIVACION',
+          message: 'No puedes desactivar tu propia cuenta activa de administrador.'
+        });
+      }
+
+      const user = db.prepare('SELECT id, full_name, username, is_active FROM users WHERE id = ?').get(userId);
+      if (!user) {
+        return res.status(404).json({ success: false, error: 'USUARIO_NO_ENCONTRADO', message: 'El usuario no existe.' });
+      }
+
+      const newStatus = user.is_active ? 0 : 1;
+      db.prepare('UPDATE users SET is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(newStatus, userId);
+
+      AuditService.log({
+        userId: req.user.id,
+        action: newStatus === 1 ? 'ACTIVATE_USER' : 'INACTIVATE_USER',
+        entity: 'USER',
+        entityId: userId,
+        details: { username: user.username, full_name: user.full_name, is_active: newStatus }
+      });
+
+      res.json({
+        success: true,
+        is_active: newStatus,
+        message: `Usuario ${user.full_name} (${user.username}) ${newStatus === 1 ? 'activado' : 'inactivado'} exitosamente.`
+      });
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
+  static checkMovements(req, res) {
+    try {
+      const { id } = req.params;
+      const userId = Number(id);
+      const ticketsCount = db.prepare('SELECT COUNT(*) as count FROM tickets WHERE user_id = ?').get(userId)?.count || 0;
+      const eventsCount = db.prepare('SELECT COUNT(*) as count FROM ticket_events WHERE user_id = ?').get(userId)?.count || 0;
+      const hasMovements = (ticketsCount + eventsCount) > 0;
+
+      res.json({
+        success: true,
+        hasMovements,
+        ticketsCount,
+        eventsCount
+      });
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
+  static delete(req, res) {
+    try {
+      const { id } = req.params;
+      const userId = Number(id);
+
+      if (req.user.id === userId) {
+        return res.status(400).json({
+          success: false,
+          error: 'NO_AUTOBORRADO',
+          message: 'No puedes eliminar tu propia cuenta de usuario activa.'
+        });
+      }
+
+      const user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
+      if (!user) {
+        return res.status(404).json({ success: false, error: 'USUARIO_NO_ENCONTRADO', message: 'El usuario no existe.' });
+      }
+
+      // Verificar si tiene movimientos en turnos o historial de eventos
+      const ticketsCount = db.prepare('SELECT COUNT(*) as count FROM tickets WHERE user_id = ?').get(userId)?.count || 0;
+      const eventsCount = db.prepare('SELECT COUNT(*) as count FROM ticket_events WHERE user_id = ?').get(userId)?.count || 0;
+      const hasMovements = (ticketsCount + eventsCount) > 0;
+
+      if (hasMovements) {
+        return res.status(400).json({
+          success: false,
+          hasMovements: true,
+          error: 'USUARIO_CON_MOVIMIENTOS',
+          message: `El usuario ${user.full_name} (${user.username}) registra ${ticketsCount} turnos y ${eventsCount} eventos de atención en el sistema. Por trazabilidad y auditoría médica no puede ser eliminado, pero puedes inactivarlo.`,
+          canInactivate: true
+        });
+      }
+
+      // Si no tiene movimientos, desasociar de módulos y borrar
+      db.prepare('UPDATE counters SET current_user_id = NULL WHERE current_user_id = ?').run(userId);
+      db.prepare('UPDATE audit_logs SET user_id = NULL WHERE user_id = ?').run(userId);
+      db.prepare('DELETE FROM users WHERE id = ?').run(userId);
+
+      AuditService.log({
+        userId: req.user.id,
+        action: 'DELETE_USER',
+        entity: 'USER',
+        entityId: userId,
+        details: { username: user.username, full_name: user.full_name }
+      });
+
+      res.json({
+        success: true,
+        message: `Usuario ${user.full_name} (${user.username}) eliminado permanentemente con éxito.`
+      });
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  }
 }
 
 module.exports = UserController;
