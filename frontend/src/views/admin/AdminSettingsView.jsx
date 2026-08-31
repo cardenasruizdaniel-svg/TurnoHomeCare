@@ -341,45 +341,45 @@ export function AdminSettingsView() {
   const handleLoadHomecareBanners = () => {
     setSettings(prev => ({
       ...prev,
-      MARQUESINA_PANTALLA: '🌸 HomeCare del Quindío I.P.S. • Bienestar en casa • Citas médicas y atención domiciliaria • Mantenga su documento a la mano • Turnos prioritarios para adultos mayores',
+      MARQUESINA_PANTALLA: '🌸 HomeCare del Quindío I.P.S. • Bienestar en casa • Citas médicas y atención integral • Mantenga su documento a la mano • Turnos prioritarios para adultos mayores',
       TIEMPO_BANNER_SEGUNDOS: 7,
       BANNERS_PUBLICIDAD: [
         {
           id: 'b1',
-          title: 'Clínica de Heridas & Cuidadoras',
-          subtitle: 'Atención especializada en heridas y asistencia personalizada con calidez humana en casa.',
-          tag: 'Atención Domiciliaria',
+          title: 'Consulta General & Cita Especializada',
+          subtitle: 'Atención médica integral presencial y con especialistas calificados para cuidar tu salud.',
+          tag: 'Atención Médica',
           imageUrl: '/banners/banner_heridas_cuidadoras.png',
           isActive: true
         },
         {
           id: 'b2',
-          title: 'Pedagogía Infantil & Toma de Muestras',
-          subtitle: 'Educación adaptada a tus hijos y laboratorio clínico en la comodidad de tu hogar.',
-          tag: 'Salud y Educación',
+          title: 'Pediatría & Medicina General',
+          subtitle: 'Cuidado especializado y seguimiento médico para bebés, niños y adultos con calidez humana.',
+          tag: 'Salud Familiar',
           imageUrl: '/banners/banner_pedagogia_muestras.png',
           isActive: true
         },
         {
           id: 'b3',
           title: 'Psicología, Nutrición y Dietética',
-          subtitle: 'Terapia emocional, manejo del estrés y planes alimenticios saludables para toda la familia.',
+          subtitle: 'Acompañamiento emocional, salud mental y planes de alimentación saludable para tu bienestar.',
           tag: 'Bienestar Integral',
           imageUrl: '/banners/banner_psicologia_nutricion.png',
           isActive: true
         },
         {
           id: 'b4',
-          title: 'Fonoaudiología & Fisioterapia',
-          subtitle: 'Terapia del lenguaje, deglución y rehabilitación física integral en el hogar.',
-          tag: 'Rehabilitación en Casa',
+          title: 'Fisioterapia & Rehabilitación',
+          subtitle: 'Terapias de rehabilitación física, movilidad y recuperación motora integral.',
+          tag: 'Rehabilitación',
           imageUrl: '/banners/banner_fono_fisioterapia.png',
           isActive: true
         },
         {
           id: 'b5',
           title: 'Terapia Ocupacional & Terapia Respiratoria',
-          subtitle: 'Desarrollo cognitivo y motor, junto a cuidado respiratorio especializado domiciliario.',
+          subtitle: 'Desarrollo funcional y cognitivo, junto a cuidado respiratorio especializado.',
           tag: 'Terapia Especializada',
           imageUrl: '/banners/banner_ocupacional_respiratoria.png',
           isActive: true

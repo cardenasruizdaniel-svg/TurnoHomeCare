@@ -40,36 +40,30 @@ async function seedDatabase() {
       'sede-circasia'
     );
 
-    // 4. Servicios Oficiales HomeCare del Quindío (15 Servicios)
+    // 4. Servicios Oficiales HomeCare del Quindío (9 Servicios Solicitados)
     const insertService = db.prepare(`
-      INSERT OR IGNORE INTO services (id, company_id, code, name, description, letter_prefix, priority_prefix, estimated_minutes, is_active, order_index)
+      INSERT OR REPLACE INTO services (id, company_id, code, name, description, letter_prefix, priority_prefix, estimated_minutes, is_active, order_index)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
-    insertService.run(1, 1, 'CH', 'Clínica de Heridas', 'Nuestro servicio domiciliario de clínica de heridas brinda atención especializada y humanizada en la comodidad de tu hogar.', 'H', 'P', 25, 1, 1);
-    insertService.run(2, 1, 'CUID', 'Cuidadoras', 'Las cuidadoras a domicilio son profesionales dedicadas a brindar asistencia y cuidados personalizados a personas que necesitan atención especial en la comodidad de su hogar.', 'C', 'P', 20, 1, 2);
-    insertService.run(3, 1, 'PI', 'Licenciadas en Pedagogía Infantil', 'La pedagogía infantil a domicilio es un enfoque educativo que se adapta a las necesidades individuales y al entorno familiar del niño.', 'P', 'P', 20, 1, 3);
-    insertService.run(4, 1, 'TM', 'Toma de muestras', 'Este servicio es especialmente beneficioso para pacientes pediátricos, pacientes con dificultades de movilidad, personas mayores o aquellos que requieren monitoreo regular de su salud.', 'M', 'P', 15, 1, 4);
-    insertService.run(5, 1, 'PSI', 'Psicología', 'A través de sesiones terapéuticas individualizadas, técnicas de intervención cognitivo-conductuales y estrategias de manejo del estrés.', 'S', 'P', 30, 1, 5);
-    insertService.run(6, 1, 'NUT', 'Nutrición y Dietética', 'Atención integral y personalizada en la comodidad del hogar del paciente, centrándose en la promoción de hábitos alimenticios saludables y la gestión de condiciones relacionadas con la nutrición.', 'N', 'P', 25, 1, 6);
-    insertService.run(7, 1, 'FON', 'Fonoaudiología y/o Terapia del Lenguaje', 'El servicio domiciliario de fonoaudiología proporciona una atención especializada y personalizada a los pacientes en la comodidad de su hogar, abordando una variedad de dificultades del habla, del lenguaje, auditivas y de deglución.', 'F', 'P', 25, 1, 7);
-    insertService.run(8, 1, 'FIS', 'Fisioterapia', 'El servicio domiciliario de fisioterapia brinda atención integral a los pacientes en la comodidad de su hogar, facilitando la recuperación y la mejora de la función física.', 'T', 'P', 30, 1, 8);
-    insertService.run(9, 1, 'TO', 'Terapia Ocupacional', 'Los terapeutas ocupacionales trabajan con individuos de todas las edades y condiciones para abordar desafíos físicos, cognitivos, emocionales y sociales.', 'O', 'P', 30, 1, 9);
-    insertService.run(10, 1, 'TR', 'Terapia Respiratoria', 'El servicio domiciliario de terapia respiratoria ofrece atención especializada en la comodidad del hogar del paciente.', 'R', 'P', 25, 1, 10);
-    insertService.run(11, 1, 'ENF', 'Enfermería', 'La enfermería a domicilio es un servicio vital que brinda atención médica y cuidados de enfermería en la comodidad del hogar del paciente.', 'E', 'P', 20, 1, 11);
-    insertService.run(12, 1, 'MG', 'Medicina General', 'Está dirigida a pacientes que requieren control médico por Medicina General, que por condiciones propias de su estado de salud presentan algún impedimento o dificultad para el traslado a su servicio médico.', 'A', 'P', 20, 1, 12);
-    insertService.run(13, 1, 'HAC', 'Hospitalización Paciente Agudo y Crónico sin Ventilador', 'Servicio de extensión hospitalaria y/o ambulatoria consistente en el manejo integral del paciente de baja complejidad.', 'U', 'P', 30, 1, 13);
-    insertService.run(14, 1, 'HCV', 'Hospitalización Paciente Crónico con Ventilador', 'Este servicio busca mejorar la calidad de vida de los pacientes y de sus familiares.', 'V', 'P', 30, 1, 14);
-    insertService.run(15, 1, 'HPED', 'Hospitalización Pediátrica', 'La pediatría es la rama de la medicina que estudia al niño y el adolescente, sus enfermedades y comportamientos.', 'D', 'P', 30, 1, 15);
+    insertService.run(1, 1, 'CG', 'Consulta General', 'Atención médica general y valoración integral de salud.', 'C', 'P', 20, 1, 1);
+    insertService.run(2, 1, 'CME', 'Cita Médica Especializada', 'Atención y valoración por médico especialista.', 'E', 'P', 30, 1, 2);
+    insertService.run(3, 1, 'PSI', 'Psicología', 'Atención psicológica y soporte emocional individualizado.', 'S', 'P', 30, 1, 3);
+    insertService.run(4, 1, 'NUT', 'Nutrición y Dietética', 'Planes de alimentación saludable y control nutricional.', 'N', 'P', 25, 1, 4);
+    insertService.run(5, 1, 'FIS', 'Fisioterapia', 'Rehabilitación física, movilidad y recuperación motora.', 'F', 'P', 30, 1, 5);
+    insertService.run(6, 1, 'TO', 'Terapia Ocupacional', 'Rehabilitación para actividades de la vida diaria y desarrollo funcional.', 'O', 'P', 30, 1, 6);
+    insertService.run(7, 1, 'TR', 'Terapia Respiratoria', 'Cuidado y rehabilitación especializada del sistema respiratorio.', 'R', 'P', 25, 1, 7);
+    insertService.run(8, 1, 'MG', 'Medicina General', 'Control médico y consulta presencial o domiciliaria.', 'M', 'P', 20, 1, 8);
+    insertService.run(9, 1, 'PED', 'Pediatría', 'Atención médica especializada para bebés, niños y adolescentes.', 'D', 'P', 30, 1, 9);
 
     // 5. Módulos y Consultorios
     const insertCounter = db.prepare(`
-      INSERT OR IGNORE INTO counters (id, branch_id, code, name, is_active)
+      INSERT OR REPLACE INTO counters (id, branch_id, code, name, is_active)
       VALUES (?, ?, ?, ?, ?)
     `);
-    insertCounter.run(1, 1, 'TERAPIA', 'Salón de Terapias', 1);
-    insertCounter.run(2, 1, 'ENT-1', 'Entrevista 1', 1);
-    insertCounter.run(3, 1, 'ENT-2', 'Entrevista 2', 1);
-    insertCounter.run(4, 1, 'CONS-1', 'Consultorio 1', 1);
+    insertCounter.run(1, 1, 'CONS-1', 'Consultorio 1', 1);
+    insertCounter.run(2, 1, 'TERAPIA', 'Salón de Terapias', 1);
+    insertCounter.run(3, 1, 'ENT-1', 'Entrevista 1', 1);
+    insertCounter.run(4, 1, 'ENT-2', 'Entrevista 2', 1);
     insertCounter.run(5, 1, 'MOD-1', 'Ventanilla 1 (Atención al Paciente)', 1);
     insertCounter.run(6, 1, 'MOD-2', 'Ventanilla 2 (Atención al Paciente)', 1);
 
@@ -77,20 +71,20 @@ async function seedDatabase() {
     const insertCounterService = db.prepare(`
       INSERT OR IGNORE INTO counter_services (counter_id, service_id) VALUES (?, ?)
     `);
-    // Ventanilla 1 y 2 atienden todos
-    for (let sId = 1; sId <= 15; sId++) {
+    // Ventanilla 1 y 2 atienden los 9 servicios
+    for (let sId = 1; sId <= 9; sId++) {
       insertCounterService.run(5, sId);
       insertCounterService.run(6, sId);
     }
-    // Salón de Terapias
-    [7, 8, 9, 10].forEach(sId => insertCounterService.run(1, sId));
-    // Entrevista 1 y 2
-    [2, 3, 5, 6].forEach(sId => {
-      insertCounterService.run(2, sId);
+    // Consultorio 1 (Consulta General, Cita Especializada, Medicina General, Pediatría)
+    [1, 2, 8, 9].forEach(sId => insertCounterService.run(1, sId));
+    // Salón de Terapias (Fisioterapia, Terapia Ocupacional, Terapia Respiratoria)
+    [5, 6, 7].forEach(sId => insertCounterService.run(2, sId));
+    // Entrevista 1 y 2 (Psicología, Nutrición y Dietética)
+    [3, 4].forEach(sId => {
       insertCounterService.run(3, sId);
+      insertCounterService.run(4, sId);
     });
-    // Consultorio 1
-    [1, 4, 11, 12, 13, 14, 15].forEach(sId => insertCounterService.run(4, sId));
 
     // 6. Usuarios
     const salt = bcrypt.genSaltSync(10);
