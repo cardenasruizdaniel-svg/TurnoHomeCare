@@ -40,7 +40,7 @@ async function seedDatabase() {
       'sede-circasia'
     );
 
-    // 4. Servicios Oficiales HomeCare del Quindío (9 Servicios Solicitados)
+    // 4. Servicios Oficiales HomeCare del Quindío (10 Servicios Solicitados)
     const insertService = db.prepare(`
       INSERT OR REPLACE INTO services (id, company_id, code, name, description, letter_prefix, priority_prefix, estimated_minutes, is_active, order_index)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -48,43 +48,41 @@ async function seedDatabase() {
     insertService.run(1, 1, 'CG', 'Consulta General', 'Atención médica general y valoración integral de salud.', 'C', 'P', 20, 1, 1);
     insertService.run(2, 1, 'CME', 'Cita Médica Especializada', 'Atención y valoración por médico especialista.', 'E', 'P', 30, 1, 2);
     insertService.run(3, 1, 'PSI', 'Psicología', 'Atención psicológica y soporte emocional individualizado.', 'S', 'P', 30, 1, 3);
-    insertService.run(4, 1, 'NUT', 'Nutrición y Dietética', 'Planes de alimentación saludable y control nutricional.', 'N', 'P', 25, 1, 4);
-    insertService.run(5, 1, 'FIS', 'Fisioterapia', 'Rehabilitación física, movilidad y recuperación motora.', 'F', 'P', 30, 1, 5);
-    insertService.run(6, 1, 'TO', 'Terapia Ocupacional', 'Rehabilitación para actividades de la vida diaria y desarrollo funcional.', 'O', 'P', 30, 1, 6);
-    insertService.run(7, 1, 'TR', 'Terapia Respiratoria', 'Cuidado y rehabilitación especializada del sistema respiratorio.', 'R', 'P', 25, 1, 7);
-    insertService.run(8, 1, 'MG', 'Medicina General', 'Control médico y consulta presencial o domiciliaria.', 'M', 'P', 20, 1, 8);
-    insertService.run(9, 1, 'PED', 'Pediatría', 'Atención médica especializada para bebés, niños y adolescentes.', 'D', 'P', 30, 1, 9);
+    insertService.run(4, 1, 'OM', 'Órdenes Médicas y Facturación', 'Emisión y validación de órdenes médicas, autorizaciones y facturación.', 'F', 'P', 15, 1, 4);
+    insertService.run(5, 1, 'NUT', 'Nutrición y Dietética', 'Planes de alimentación saludable y control nutricional.', 'N', 'P', 25, 1, 5);
+    insertService.run(6, 1, 'FIS', 'Fisioterapia', 'Rehabilitación física, movilidad y recuperación motora.', 'T', 'P', 30, 1, 6);
+    insertService.run(7, 1, 'TO', 'Terapia Ocupacional', 'Rehabilitación para actividades de la vida diaria y desarrollo funcional.', 'O', 'P', 30, 1, 7);
+    insertService.run(8, 1, 'TR', 'Terapia Respiratoria', 'Cuidado y rehabilitación especializada del sistema respiratorio.', 'R', 'P', 25, 1, 8);
+    insertService.run(9, 1, 'MG', 'Medicina General', 'Control médico y consulta presencial o domiciliaria.', 'M', 'P', 20, 1, 9);
+    insertService.run(10, 1, 'PED', 'Pediatría', 'Atención médica especializada para bebés, niños y adolescentes.', 'D', 'P', 30, 1, 10);
 
-    // 5. Módulos y Consultorios
+    // 5. Módulos y Consultorios (5 Módulos Solicitados)
     const insertCounter = db.prepare(`
       INSERT OR REPLACE INTO counters (id, branch_id, code, name, is_active)
       VALUES (?, ?, ?, ?, ?)
     `);
-    insertCounter.run(1, 1, 'CONS-1', 'Consultorio 1', 1);
-    insertCounter.run(2, 1, 'TERAPIA', 'Salón de Terapias', 1);
-    insertCounter.run(3, 1, 'ENT-1', 'Entrevista 1', 1);
-    insertCounter.run(4, 1, 'ENT-2', 'Entrevista 2', 1);
-    insertCounter.run(5, 1, 'MOD-1', 'Ventanilla 1 (Atención al Paciente)', 1);
-    insertCounter.run(6, 1, 'MOD-2', 'Ventanilla 2 (Atención al Paciente)', 1);
+    insertCounter.run(1, 1, 'ENT-1', 'Entrevista 1', 1);
+    insertCounter.run(2, 1, 'ENT-2', 'Entrevista 2', 1);
+    insertCounter.run(3, 1, 'CONS-1', 'Consultorio 1', 1);
+    insertCounter.run(4, 1, 'MOD-1', 'Ventanilla 1', 1);
+    insertCounter.run(5, 1, 'MOD-2', 'Ventanilla 2', 1);
 
     // Asignación de servicios a módulos
     const insertCounterService = db.prepare(`
       INSERT OR IGNORE INTO counter_services (counter_id, service_id) VALUES (?, ?)
     `);
-    // Ventanilla 1 y 2 atienden los 9 servicios
-    for (let sId = 1; sId <= 9; sId++) {
-      insertCounterService.run(5, sId);
-      insertCounterService.run(6, sId);
-    }
-    // Consultorio 1 (Consulta General, Cita Especializada, Medicina General, Pediatría)
-    [1, 2, 8, 9].forEach(sId => insertCounterService.run(1, sId));
-    // Salón de Terapias (Fisioterapia, Terapia Ocupacional, Terapia Respiratoria)
-    [5, 6, 7].forEach(sId => insertCounterService.run(2, sId));
-    // Entrevista 1 y 2 (Psicología, Nutrición y Dietética)
-    [3, 4].forEach(sId => {
-      insertCounterService.run(3, sId);
+    // Ventanilla 1 y 2 atienden los 10 servicios
+    for (let sId = 1; sId <= 10; sId++) {
       insertCounterService.run(4, sId);
+      insertCounterService.run(5, sId);
+    }
+    // Entrevista 1 y 2 (Psicología, Nutrición y Dietética)
+    [3, 5].forEach(sId => {
+      insertCounterService.run(1, sId);
+      insertCounterService.run(2, sId);
     });
+    // Consultorio 1 (Consulta General, Cita Especializada, Medicina General, Pediatría, Fisioterapia, Terapia Ocupacional, Terapia Respiratoria)
+    [1, 2, 6, 7, 8, 9, 10].forEach(sId => insertCounterService.run(3, sId));
 
     // 6. Usuarios
     const salt = bcrypt.genSaltSync(10);

@@ -29,22 +29,31 @@ const officialServices = [
     order_index: 3
   },
   {
+    code: "OM",
+    name: "Órdenes Médicas y Facturación",
+    description: "Emisión y validación de órdenes médicas, autorizaciones y facturación.",
+    letter_prefix: "F",
+    priority_prefix: "P",
+    estimated_minutes: 15,
+    order_index: 4
+  },
+  {
     code: "NUT",
     name: "Nutrición y Dietética",
     description: "Planes de alimentación saludable y control nutricional.",
     letter_prefix: "N",
     priority_prefix: "P",
     estimated_minutes: 25,
-    order_index: 4
+    order_index: 5
   },
   {
     code: "FIS",
     name: "Fisioterapia",
     description: "Rehabilitación física, movilidad y recuperación motora.",
-    letter_prefix: "F",
+    letter_prefix: "T",
     priority_prefix: "P",
     estimated_minutes: 30,
-    order_index: 5
+    order_index: 6
   },
   {
     code: "TO",
@@ -53,7 +62,7 @@ const officialServices = [
     letter_prefix: "O",
     priority_prefix: "P",
     estimated_minutes: 30,
-    order_index: 6
+    order_index: 7
   },
   {
     code: "TR",
@@ -62,7 +71,7 @@ const officialServices = [
     letter_prefix: "R",
     priority_prefix: "P",
     estimated_minutes: 25,
-    order_index: 7
+    order_index: 8
   },
   {
     code: "MG",
@@ -71,7 +80,7 @@ const officialServices = [
     letter_prefix: "M",
     priority_prefix: "P",
     estimated_minutes: 20,
-    order_index: 8
+    order_index: 9
   },
   {
     code: "PED",
@@ -80,7 +89,7 @@ const officialServices = [
     letter_prefix: "D",
     priority_prefix: "P",
     estimated_minutes: 30,
-    order_index: 9
+    order_index: 10
   }
 ];
 
@@ -106,12 +115,11 @@ const officialBranches = [
 ];
 
 const officialCounters = [
-  { code: "CONS-1", name: "Consultorio 1" },
-  { code: "TERAPIA", name: "Salón de Terapias" },
   { code: "ENT-1", name: "Entrevista 1" },
   { code: "ENT-2", name: "Entrevista 2" },
-  { code: "MOD-1", name: "Ventanilla 1 (Atención al Paciente)" },
-  { code: "MOD-2", name: "Ventanilla 2 (Atención al Paciente)" }
+  { code: "CONS-1", name: "Consultorio 1" },
+  { code: "MOD-1", name: "Ventanilla 1" },
+  { code: "MOD-2", name: "Ventanilla 2" }
 ];
 
 async function syncServicesAndCounters() {
@@ -127,12 +135,13 @@ async function syncServicesAndCounters() {
       }
     }
 
-    // 1. Desactivar todos los servicios que no estén en la lista oficial de los 9 solicitados
+    // 1. BORRAR todos los servicios que no estén en la lista oficial de los 10 solicitados
     const officialCodes = officialServices.map(s => s.code);
     const placeholders = officialCodes.map(() => '?').join(',');
-    db.prepare(`UPDATE services SET is_active = 0 WHERE code NOT IN (${placeholders}, 'CM', 'HPED')`).run(...officialCodes);
+    db.prepare(`DELETE FROM counter_services WHERE service_id IN (SELECT id FROM services WHERE code NOT IN (${placeholders}, 'CM', 'HPED'))`).run(...officialCodes);
+    db.prepare(`DELETE FROM services WHERE code NOT IN (${placeholders}, 'CM', 'HPED')`).run(...officialCodes);
 
-    // 2. Insertar o actualizar los 9 servicios oficiales requeridos
+    // 2. Insertar o actualizar los 10 servicios oficiales requeridos
     for (const s of officialServices) {
       const existing = db.prepare("SELECT id FROM services WHERE code = ? OR (code = 'CM' AND ? = 'CME') OR (code = 'HPED' AND ? = 'PED')").get(s.code, s.code, s.code);
       if (existing) {
@@ -144,14 +153,20 @@ async function syncServicesAndCounters() {
       }
     }
 
-    // 3. Insertar consultorios/módulos oficiales únicamente si no existen
+    // 3. BORRAR todos los módulos que no estén en la lista oficial de los 5 requeridos
+    const counterCodes = officialCounters.map(c => c.code);
+    const cPlaceholders = counterCodes.map(() => '?').join(',');
+    db.prepare(`DELETE FROM counter_services WHERE counter_id IN (SELECT id FROM counters WHERE code NOT IN (${cPlaceholders}))`).run(...counterCodes);
+    db.prepare(`DELETE FROM counters WHERE code NOT IN (${cPlaceholders})`).run(...counterCodes);
+
+    // 4. Insertar o actualizar los 5 consultorios/módulos oficiales requeridos
     for (const c of officialCounters) {
       const existing = db.prepare("SELECT id FROM counters WHERE code = ?").get(c.code);
       if (!existing) {
         db.prepare("INSERT INTO counters (branch_id, code, name, is_active) VALUES (1, ?, ?, 1)")
           .run(c.code, c.name);
       } else {
-        db.prepare("UPDATE counters SET is_active = 1 WHERE id = ?").run(existing.id);
+        db.prepare("UPDATE counters SET name = ?, is_active = 1 WHERE id = ?").run(c.name, existing.id);
       }
     }
 
@@ -166,6 +181,7 @@ async function syncServicesAndCounters() {
 
     const insertCounterService = db.prepare("INSERT OR IGNORE INTO counter_services (counter_id, service_id) VALUES (?, ?)");
 
+    // Ventanilla 1 y 2 atienden los 10 servicios
     if (counterMap["MOD-1"]) {
       allServices.forEach(s => insertCounterService.run(counterMap["MOD-1"], s.id));
     }
@@ -173,12 +189,7 @@ async function syncServicesAndCounters() {
       allServices.forEach(s => insertCounterService.run(counterMap["MOD-2"], s.id));
     }
 
-    if (counterMap["TERAPIA"]) {
-      ["FIS", "TO", "TR"].forEach(code => {
-        if (serviceMap[code]) insertCounterService.run(counterMap["TERAPIA"], serviceMap[code]);
-      });
-    }
-
+    // Entrevista 1 y 2 atienden Psicología y Nutrición
     ["ENT-1", "ENT-2"].forEach(entCode => {
       if (counterMap[entCode]) {
         ["PSI", "NUT"].forEach(code => {
@@ -187,8 +198,9 @@ async function syncServicesAndCounters() {
       }
     });
 
+    // Consultorio 1 atiende Consulta General, Cita Especializada, Medicina General, Pediatría, Terapias
     if (counterMap["CONS-1"]) {
-      ["CG", "CME", "MG", "PED"].forEach(code => {
+      ["CG", "CME", "MG", "PED", "FIS", "TO", "TR"].forEach(code => {
         if (serviceMap[code]) insertCounterService.run(counterMap["CONS-1"], serviceMap[code]);
       });
     }
