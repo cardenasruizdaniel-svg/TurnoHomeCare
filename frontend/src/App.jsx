@@ -9,6 +9,7 @@ import { StaffDeskView } from './views/StaffDeskView';
 import { LoginView } from './views/LoginView';
 import { AdminLayout } from './views/admin/AdminLayout';
 import { AdminDashboardView } from './views/admin/AdminDashboardView';
+import { AdminScheduleView } from './views/admin/AdminScheduleView';
 import { AdminTicketsView } from './views/admin/AdminTicketsView';
 import { AdminServicesView } from './views/admin/AdminServicesView';
 import { AdminCountersView } from './views/admin/AdminCountersView';
@@ -55,6 +56,7 @@ export function App() {
           <Route path="/admin" element={<AdminLayout />}>
             <Route index element={<Navigate to="/admin/dashboard" replace />} />
             <Route path="dashboard"     element={<AdminDashboardView />} />
+            <Route path="programacion"  element={<AdminScheduleView />} />
             <Route path="turnos"        element={<AdminTicketsView />} />
             <Route path="servicios"     element={<AdminServicesView />} />
             <Route path="modulos"       element={<AdminCountersView />} />

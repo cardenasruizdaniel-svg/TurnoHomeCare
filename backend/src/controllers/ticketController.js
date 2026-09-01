@@ -302,6 +302,157 @@ class TicketController {
       res.status(404).json({ success: false, error: err.message });
     }
   }
-}
 
-module.exports = TicketController;
+  /**
+   * Obtiene datos de la programación de turnos (agenda, métricas, módulo workload)
+   */
+  static getSchedule(req, res) {
+    try {
+      const branchId = Number(req.query.branchId || (req.user ? req.user.branch_id : 1) || 1);
+      const { startDate, endDate, date, serviceId, counterId, userId, status, search } = req.query;
+
+      const data = TicketService.getScheduleData({
+        branchId,
+        startDate,
+        endDate,
+        date,
+        serviceId,
+        counterId,
+        userId,
+        status,
+        search
+      });
+
+      res.json({ success: true, ...data });
+    } catch (err) {
+      console.error('Error obteniendo agenda de turnos:', err);
+      res.status(500).json({ success: false, error: 'SERVER_ERROR', message: err.message });
+    }
+  }
+
+  /**
+   * Crear un turno programado para fecha futura u hoy
+   */
+  static createSchedule(req, res) {
+    try {
+      const {
+        branchId = 1,
+        scheduledDate,
+        appointmentTime,
+        serviceId,
+        counterId,
+        userId,
+        patientData,
+        ticketType,
+        notes
+      } = req.body;
+
+      if (!serviceId || !patientData || !patientData.documentNumber) {
+        return res.status(400).json({
+          success: false,
+          error: 'CAMPOS_INCOMPLETOS',
+          message: 'Debe seleccionar un servicio y proporcionar cédula del paciente.'
+        });
+      }
+
+      const createdByUserId = req.user ? req.user.id : null;
+      const result = TicketService.createScheduledTicket({
+        branchId: Number(branchId),
+        scheduledDate,
+        appointmentTime,
+        serviceId: Number(serviceId),
+        counterId: counterId ? Number(counterId) : null,
+        userId: userId ? Number(userId) : null,
+        patientData,
+        ticketType,
+        notes,
+        createdByUserId
+      });
+
+      if (!result.is_duplicate) {
+        socketHandler.emitTicketCreated(branchId, { ticket: result.ticket });
+      }
+
+      res.status(result.is_duplicate ? 200 : 201).json({
+        success: true,
+        ...result
+      });
+    } catch (err) {
+      console.error('Error al programar turno:', err);
+      res.status(400).json({ success: false, error: err.message, message: err.message });
+    }
+  }
+
+  /**
+   * Editar directamente un turno que NO ha sido llamado
+   */
+  static editUncalled(req, res) {
+    try {
+      const ticketId = Number(req.params.id);
+      const {
+        patientData,
+        serviceId,
+        scheduledDate,
+        appointmentTime,
+        counterId,
+        userId,
+        ticketType,
+        notes
+      } = req.body;
+
+      const modifiedByUserId = req.user ? req.user.id : null;
+
+      const ticket = TicketService.editUncalledTicket({
+        ticketId,
+        patientData,
+        serviceId,
+        scheduledDate,
+        appointmentTime,
+        counterId,
+        userId,
+        ticketType,
+        notes,
+        modifiedByUserId
+      });
+
+      socketHandler.emitTicketStatusChanged(ticket.branch_id, ticket);
+      socketHandler.emitQueueUpdated(ticket.branch_id);
+
+      res.json({
+        success: true,
+        message: 'Turno actualizado exitosamente.',
+        ticket
+      });
+    } catch (err) {
+      console.error('Error editando turno no llamado:', err);
+      res.status(400).json({ success: false, error: err.message, message: err.message });
+    }
+  }
+
+  /**
+   * Cancelar directamente un turno que NO ha sido llamado
+   */
+  static cancelUncalled(req, res) {
+    try {
+      const ticketId = Number(req.params.id);
+      const { reason } = req.body;
+      const cancelledByUserId = req.user ? req.user.id : null;
+
+      const result = TicketService.cancelUncalledTicket({
+        ticketId,
+        reason,
+        cancelledByUserId
+      });
+
+      const branchId = Number(req.query.branchId || (req.user ? req.user.branch_id : 1) || 1);
+      socketHandler.emitTicketStatusChanged(branchId, { id: ticketId, status: 'CANCELADO' });
+      socketHandler.emitQueueUpdated(branchId);
+
+      res.json(result);
+    } catch (err) {
+      console.error('Error cancelando turno no llamado:', err);
+      res.status(400).json({ success: false, error: err.message, message: err.message });
+    }
+  }
+
+}

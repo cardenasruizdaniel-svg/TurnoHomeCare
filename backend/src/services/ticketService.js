@@ -268,7 +268,7 @@ class TicketService {
 
     // 4. Evaluar la proporción de atención histórica del día (Ratio de Prioridad)
     const ratioPriority = SettingsService.get('RATIO_PRIORIDAD', branchId) || 2;
-    const today = new Date().toISOString().slice(0, 10);
+    const _now = new Date(); const today = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, '0')}-${String(_now.getDate()).padStart(2, '0')}`;
 
     // Obtener los últimos turnos llamados ordenados por el historial exacto de eventos
     const recentCalled = db.prepare(`
@@ -309,6 +309,7 @@ class TicketService {
    * Llamar siguiente turno con bloqueo de concurrencia atómica
    */
   static callNextTicket({ counterId, userId, branchId, specificTicketId = null }) {
+    this.activateScheduledTicketsForToday();
     let calledTicket = null;
 
     const transaction = db.transaction(() => {
@@ -661,6 +662,7 @@ class TicketService {
    * Datos para la Pantalla Pública TV
    */
   static getPublicDisplayData(branchId = 1) {
+    this.activateScheduledTicketsForToday();
     const historyCount = SettingsService.get('HISTORIAL_PANTALLA_CANTIDAD', branchId) || 6;
 
     // Turno actualmente en llamado o atención más reciente
@@ -714,6 +716,7 @@ class TicketService {
    * Obtiene la cola de espera activa para la sede o módulo y la agenda del día
    */
   static getWaitingQueue(branchId = 1, counterId = null) {
+    this.activateScheduledTicketsForToday();
     let counterFilter = '';
     const params = [branchId];
     let assignedServiceNames = [];
@@ -925,6 +928,541 @@ class TicketService {
 
     return { success: true, message: 'Turnero reiniciado a 1 exitosamente.' };
   }
+
+  /**
+   * Activa automáticamente turnos programados cuya fecha es hoy o anterior
+   */
+  static activateScheduledTicketsForToday() {
+    try {
+      const _now = new Date(); const today = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, '0')}-${String(_now.getDate()).padStart(2, '0')}`;
+      const info = db.prepare(`
+        UPDATE tickets 
+        SET status = 'ESPERANDO'
+        WHERE status IN ('PROGRAMADO', 'CONFIRMADO')
+          AND scheduled_date IS NOT NULL
+          AND scheduled_date <= ?
+      `).run(today);
+    } catch (e) {
+      console.error('Error en activateScheduledTicketsForToday:', e);
+    }
+  }
+
+  /**
+   * Crea una programación de turno para fecha hoy o futura
+   */
+  static createScheduledTicket({
+    branchId = 1,
+    scheduledDate,
+    appointmentTime = null,
+    serviceId,
+    counterId = null,
+    userId = null,
+    patientData,
+    ticketType = null,
+    notes = null,
+    createdByUserId = null
+  }) {
+    this.activateScheduledTicketsForToday();
+
+    const _now = new Date(); const today = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, '0')}-${String(_now.getDate()).padStart(2, '0')}`;
+    const targetDate = scheduledDate || today;
+
+    const branch = db.prepare('SELECT * FROM branches WHERE id = ? AND is_active = 1').get(branchId);
+    if (!branch) throw new Error('SEDE_NO_ENCONTRADA_O_INACTIVA');
+
+    const service = db.prepare('SELECT * FROM services WHERE id = ? AND is_active = 1').get(serviceId);
+    if (!service) throw new Error('SERVICIO_NO_ENCONTRADO_O_INACTIVO');
+
+    // 1. Obtener o crear paciente
+    const patient = this.getOrCreatePatient(patientData);
+
+    // 2. Prevenir duplicados coincidentes en la misma fecha y servicio
+    const existingActive = db.prepare(`
+      SELECT t.*, s.name as service_name
+      FROM tickets t
+      JOIN services s ON t.service_id = s.id
+      WHERE t.patient_id = ?
+        AND t.branch_id = ?
+        AND t.service_id = ?
+        AND (t.scheduled_date = ? OR t.created_date = ?)
+        AND t.status IN ('PROGRAMADO', 'CONFIRMADO', 'ESPERANDO', 'LLAMADO', 'EN_ATENCION')
+      LIMIT 1
+    `).get(patient.id, branchId, service.id, targetDate, targetDate);
+
+    if (existingActive) {
+      return {
+        is_duplicate: true,
+        message: `El paciente ${patient.full_name} ya tiene un turno (${existingActive.ticket_number}) activo para ${existingActive.service_name} en la fecha ${targetDate}.`,
+        ticket: existingActive
+      };
+    }
+
+    // 3. Determinar tipo de turno y prefijo
+    const priorityMinAge = SettingsService.get('EDAD_PRIORIDAD', branchId) || 60;
+    const isPriorityAuto = patient.age >= priorityMinAge || patient.is_priority_auto === 1;
+    const finalTicketType = ticketType || (isPriorityAuto ? 'PRIORITARIO' : 'NORMAL');
+    const isPriority = finalTicketType === 'PRIORITARIO' || finalTicketType === 'ESPECIAL';
+
+    const defaultNormalPrefix = SettingsService.get('PREFIJO_NORMAL', branchId) || 'A';
+    const defaultPriorityPrefix = SettingsService.get('PREFIJO_PRIORITARIO', branchId) || 'P';
+    const numDigits = SettingsService.get('DIGITOS_NUMERACION', branchId) || 3;
+
+    const prefix = isPriority
+      ? (service.priority_prefix || defaultPriorityPrefix)
+      : (service.letter_prefix || defaultNormalPrefix);
+
+    // Estado inicial: PROGRAMADO si es futuro, ESPERANDO si es hoy o anterior
+    const initialStatus = targetDate > today ? 'PROGRAMADO' : 'ESPERANDO';
+
+    let createdTicket = null;
+
+    const transaction = db.transaction(() => {
+      const lastSeq = db.prepare(`
+        SELECT MAX(sequence_number) as max_seq
+        FROM tickets
+        WHERE branch_id = ? 
+          AND service_id = ?
+          AND (scheduled_date = ? OR created_date = ?)
+      `).get(branchId, service.id, targetDate, targetDate);
+
+      const nextSequence = (lastSeq && lastSeq.max_seq ? Number(lastSeq.max_seq) : 0) + 1;
+      const formattedSeq = String(nextSequence).padStart(numDigits, '0');
+      const ticketNumber = `${prefix}-${formattedSeq}`;
+
+      const res = db.prepare(`
+        INSERT INTO tickets (
+          ticket_number, branch_id, service_id, patient_id, counter_id, user_id,
+          ticket_type, status, sequence_number, created_date, scheduled_date, appointment_time, notes
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        ticketNumber,
+        branchId,
+        service.id,
+        patient.id,
+        counterId ? Number(counterId) : null,
+        userId ? Number(userId) : null,
+        finalTicketType,
+        initialStatus,
+        nextSequence,
+        today,
+        targetDate,
+        appointmentTime || null,
+        notes || null
+      );
+
+      const ticketId = res.lastInsertRowid;
+
+      db.prepare(`
+        INSERT INTO ticket_events (ticket_id, from_status, to_status, user_id, counter_id, metadata)
+        VALUES (?, NULL, ?, ?, ?, ?)
+      `).run(
+        ticketId,
+        initialStatus,
+        createdByUserId ? Number(createdByUserId) : null,
+        counterId ? Number(counterId) : null,
+        JSON.stringify({ scheduledDate: targetDate, appointmentTime, isPriority, notes })
+      );
+
+      createdTicket = db.prepare(`
+        SELECT t.*, s.name as service_name, s.code as service_code, 
+               p.full_name as patient_name, p.document_number, p.age as patient_age, p.phone as patient_phone,
+               b.name as branch_name,
+               c.name as counter_name, c.code as counter_code,
+               u.full_name as staff_name
+        FROM tickets t
+        JOIN services s ON t.service_id = s.id
+        JOIN patients p ON t.patient_id = p.id
+        JOIN branches b ON t.branch_id = b.id
+        LEFT JOIN counters c ON t.counter_id = c.id
+        LEFT JOIN users u ON t.user_id = u.id
+        WHERE t.id = ?
+      `).get(ticketId);
+    });
+
+    transaction();
+
+    AuditService.log({
+      userId: createdByUserId,
+      action: 'CREATE_SCHEDULED_TICKET',
+      entity: 'TICKET',
+      entityId: createdTicket.id,
+      details: {
+        ticket_number: createdTicket.ticket_number,
+        scheduled_date: targetDate,
+        patient_doc: patient.document_number,
+        counter_id: counterId
+      }
+    });
+
+    return {
+      is_duplicate: false,
+      ticket: createdTicket
+    };
+  }
+
+  /**
+   * Obtiene la lista de turnos programados, calendario por días y métricas
+   */
+  static getScheduleData({
+    branchId = 1,
+    startDate = null,
+    endDate = null,
+    date = null,
+    serviceId = null,
+    counterId = null,
+    userId = null,
+    status = null,
+    search = null
+  }) {
+    this.activateScheduledTicketsForToday();
+
+    const _now = new Date(); const today = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, '0')}-${String(_now.getDate()).padStart(2, '0')}`;
+    const targetDate = date || today;
+
+    let conditions = ['t.branch_id = ?'];
+    let params = [branchId];
+
+    if (date) {
+      conditions.push('(t.scheduled_date = ? OR (t.scheduled_date IS NULL AND t.created_date = ?))');
+      params.push(date, date);
+    } else if (startDate && endDate) {
+      conditions.push('COALESCE(t.scheduled_date, t.created_date) BETWEEN ? AND ?');
+      params.push(startDate, endDate);
+    }
+
+    if (serviceId) {
+      conditions.push('t.service_id = ?');
+      params.push(Number(serviceId));
+    }
+
+    if (counterId) {
+      conditions.push('t.counter_id = ?');
+      params.push(Number(counterId));
+    }
+
+    if (userId) {
+      conditions.push('t.user_id = ?');
+      params.push(Number(userId));
+    }
+
+    if (status) {
+      conditions.push('t.status = ?');
+      params.push(status);
+    }
+
+    if (search && search.trim()) {
+      const term = `%${search.trim()}%`;
+      conditions.push('(p.full_name LIKE ? OR p.document_number LIKE ? OR t.ticket_number LIKE ?)');
+      params.push(term, term, term);
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    const tickets = db.prepare(`
+      SELECT t.*, s.name as service_name, s.code as service_code, s.estimated_minutes,
+             p.full_name as patient_name, p.document_number, p.age as patient_age, p.phone as patient_phone,
+             c.name as counter_name, c.code as counter_code,
+             u.full_name as staff_name
+      FROM tickets t
+      JOIN services s ON t.service_id = s.id
+      JOIN patients p ON t.patient_id = p.id
+      LEFT JOIN counters c ON t.counter_id = c.id
+      LEFT JOIN users u ON t.user_id = u.id
+      ${whereClause}
+      ORDER BY 
+        COALESCE(t.scheduled_date, t.created_date) ASC,
+        CASE WHEN t.appointment_time IS NOT NULL AND t.appointment_time != '' THEN t.appointment_time ELSE '99:99' END ASC,
+        t.created_at ASC
+    `).all(...params);
+
+    // Resumen de calendario por fecha
+    const calendarRows = db.prepare(`
+      SELECT 
+        COALESCE(scheduled_date, created_date) as day,
+        COUNT(*) as total,
+        SUM(CASE WHEN status = 'PROGRAMADO' THEN 1 ELSE 0 END) as programados,
+        SUM(CASE WHEN status = 'ESPERANDO' THEN 1 ELSE 0 END) as esperando,
+        SUM(CASE WHEN status IN ('LLAMADO', 'EN_ATENCION') THEN 1 ELSE 0 END) as en_atencion,
+        SUM(CASE WHEN status = 'FINALIZADO' THEN 1 ELSE 0 END) as finalizados,
+        SUM(CASE WHEN status = 'CANCELADO' THEN 1 ELSE 0 END) as cancelados,
+        SUM(CASE WHEN status = 'NO_PRESENTO' THEN 1 ELSE 0 END) as no_presentados
+      FROM tickets
+      WHERE branch_id = ?
+      GROUP BY day
+    `).all(branchId);
+
+    const calendarSummary = {};
+    for (const r of calendarRows) {
+      if (r.day) {
+        calendarSummary[r.day] = r;
+      }
+    }
+
+    // Métricas del día seleccionado
+    const metricsRow = db.prepare(`
+      SELECT 
+        COUNT(*) as total_dia,
+        SUM(CASE WHEN status = 'PROGRAMADO' THEN 1 ELSE 0 END) as programados_hoy,
+        SUM(CASE WHEN status = 'ESPERANDO' THEN 1 ELSE 0 END) as en_espera,
+        SUM(CASE WHEN status = 'FINALIZADO' THEN 1 ELSE 0 END) as atendidos,
+        SUM(CASE WHEN status = 'CANCELADO' THEN 1 ELSE 0 END) as cancelados,
+        SUM(CASE WHEN status = 'NO_PRESENTO' THEN 1 ELSE 0 END) as no_presentados
+      FROM tickets
+      WHERE branch_id = ?
+        AND (scheduled_date = ? OR (scheduled_date IS NULL AND created_date = ?))
+    `).get(branchId, targetDate, targetDate);
+
+    const activeCountersCount = db.prepare(`
+      SELECT COUNT(DISTINCT counter_id) as count
+      FROM tickets
+      WHERE branch_id = ?
+        AND (scheduled_date = ? OR (scheduled_date IS NULL AND created_date = ?))
+        AND counter_id IS NOT NULL
+        AND status IN ('PROGRAMADO', 'ESPERANDO', 'LLAMADO', 'EN_ATENCION')
+    `).get(branchId, targetDate, targetDate);
+
+    const dashboardMetrics = {
+      programadosHoy: metricsRow ? (metricsRow.programados_hoy || 0) : 0,
+      enEspera: metricsRow ? (metricsRow.en_espera || 0) : 0,
+      atendidos: metricsRow ? (metricsRow.atendidos || 0) : 0,
+      cancelados: metricsRow ? (metricsRow.cancelados || 0) : 0,
+      noPresentados: metricsRow ? (metricsRow.no_presentados || 0) : 0,
+      modulosActivos: activeCountersCount ? (activeCountersCount.count || 0) : 0
+    };
+
+    // Desglose por Módulo / Consultorio para la fecha seleccionada
+    const allCounters = db.prepare(`
+      SELECT id, name, code, is_active FROM counters WHERE branch_id = ? ORDER BY code ASC
+    `).all(branchId);
+
+    const moduleWorkload = allCounters.map(counter => {
+      const counterTickets = tickets.filter(t => t.counter_id === counter.id);
+      return {
+        counter_id: counter.id,
+        counter_name: counter.name,
+        counter_code: counter.code,
+        is_active: counter.is_active === 1,
+        total_tickets: counterTickets.length,
+        tickets: counterTickets
+      };
+    });
+
+    const unassignedTickets = tickets.filter(t => !t.counter_id);
+    if (unassignedTickets.length > 0) {
+      moduleWorkload.unshift({
+        counter_id: null,
+        counter_name: 'Sin Módulo Asignado',
+        counter_code: 'GENERAL',
+        is_active: true,
+        total_tickets: unassignedTickets.length,
+        tickets: unassignedTickets
+      });
+    }
+
+    return {
+      tickets,
+      calendarSummary,
+      dashboardMetrics,
+      moduleWorkload,
+      selectedDate: targetDate
+    };
+  }
+
+  /**
+   * Editar directamente cualquier turno que NO haya sido llamado aún
+   */
+  static editUncalledTicket({
+    ticketId,
+    patientData = null,
+    serviceId = null,
+    scheduledDate = null,
+    appointmentTime = null,
+    counterId = null,
+    userId = null,
+    ticketType = null,
+    notes = null,
+    modifiedByUserId = null
+  }) {
+    this.activateScheduledTicketsForToday();
+
+    const ticket = db.prepare(`
+      SELECT t.*, p.document_number, p.full_name as patient_name
+      FROM tickets t
+      JOIN patients p ON t.patient_id = p.id
+      WHERE t.id = ?
+    `).get(ticketId);
+
+    if (!ticket) {
+      throw new Error('TURNO_NO_ENCONTRADO');
+    }
+
+    const editableStatuses = ['PROGRAMADO', 'CONFIRMADO', 'ESPERANDO', 'PAUSADO'];
+    if (!editableStatuses.includes(ticket.status)) {
+      throw new Error(`NO_EDITABLE_ESTADO: El turno ${ticket.ticket_number} ya se encuentra en estado ${ticket.status} y no se puede modificar libremente.`);
+    }
+
+    const _now = new Date(); const today = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, '0')}-${String(_now.getDate()).padStart(2, '0')}`;
+    const beforeMetadata = {
+      service_id: ticket.service_id,
+      counter_id: ticket.counter_id,
+      user_id: ticket.user_id,
+      scheduled_date: ticket.scheduled_date,
+      appointment_time: ticket.appointment_time,
+      ticket_type: ticket.ticket_type,
+      status: ticket.status
+    };
+
+    let updatedPatientId = ticket.patient_id;
+    if (patientData && patientData.documentNumber) {
+      const patient = this.getOrCreatePatient(patientData);
+      updatedPatientId = patient.id;
+    }
+
+    const newScheduledDate = scheduledDate || ticket.scheduled_date || ticket.created_date || today;
+    const newServiceId = serviceId ? Number(serviceId) : ticket.service_id;
+    const newCounterId = counterId !== undefined ? (counterId ? Number(counterId) : null) : ticket.counter_id;
+    const newUserId = userId !== undefined ? (userId ? Number(userId) : null) : ticket.user_id;
+    const newTicketType = ticketType || ticket.ticket_type;
+    const newAppointmentTime = appointmentTime !== undefined ? appointmentTime : ticket.appointment_time;
+    const newNotes = notes !== undefined ? notes : ticket.notes;
+
+    let newStatus = ticket.status;
+    if (newScheduledDate > today) {
+      newStatus = 'PROGRAMADO';
+    } else if (newScheduledDate <= today && ticket.status === 'PROGRAMADO') {
+      newStatus = 'ESPERANDO';
+    }
+
+    db.prepare(`
+      UPDATE tickets
+      SET patient_id = ?,
+          service_id = ?,
+          counter_id = ?,
+          user_id = ?,
+          ticket_type = ?,
+          scheduled_date = ?,
+          appointment_time = ?,
+          notes = ?,
+          status = ?
+      WHERE id = ?
+    `).run(
+      updatedPatientId,
+      newServiceId,
+      newCounterId,
+      newUserId,
+      newTicketType,
+      newScheduledDate,
+      newAppointmentTime,
+      newNotes,
+      newStatus,
+      ticketId
+    );
+
+    const afterMetadata = {
+      service_id: newServiceId,
+      counter_id: newCounterId,
+      user_id: newUserId,
+      scheduled_date: newScheduledDate,
+      appointment_time: newAppointmentTime,
+      ticket_type: newTicketType,
+      status: newStatus
+    };
+
+    db.prepare(`
+      INSERT INTO ticket_events (ticket_id, from_status, to_status, user_id, counter_id, metadata)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(
+      ticketId,
+      ticket.status,
+      newStatus,
+      modifiedByUserId ? Number(modifiedByUserId) : null,
+      newCounterId,
+      JSON.stringify({ action: 'EDIT_UNCALLED', before: beforeMetadata, after: afterMetadata })
+    );
+
+    AuditService.log({
+      userId: modifiedByUserId,
+      action: 'EDIT_UNCALLED_TICKET',
+      entity: 'TICKET',
+      entityId: ticketId,
+      details: {
+        ticket_number: ticket.ticket_number,
+        before: beforeMetadata,
+        after: afterMetadata
+      }
+    });
+
+    return db.prepare(`
+      SELECT t.*, s.name as service_name, s.code as service_code, 
+             p.full_name as patient_name, p.document_number, p.age as patient_age, p.phone as patient_phone,
+             c.name as counter_name, c.code as counter_code,
+             u.full_name as staff_name
+      FROM tickets t
+      JOIN services s ON t.service_id = s.id
+      JOIN patients p ON t.patient_id = p.id
+      LEFT JOIN counters c ON t.counter_id = c.id
+      LEFT JOIN users u ON t.user_id = u.id
+      WHERE t.id = ?
+    `).get(ticketId);
+  }
+
+  /**
+   * Cancelar directamente cualquier turno que NO haya sido llamado aún
+   */
+  static cancelUncalledTicket({ ticketId, reason = null, cancelledByUserId = null }) {
+    const ticket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(ticketId);
+    if (!ticket) {
+      throw new Error('TURNO_NO_ENCONTRADO');
+    }
+
+    const cancelableStatuses = ['PROGRAMADO', 'CONFIRMADO', 'ESPERANDO', 'PAUSADO'];
+    if (!cancelableStatuses.includes(ticket.status)) {
+      throw new Error(`NO_CANCELABLE_ESTADO: El turno ${ticket.ticket_number} está en estado ${ticket.status} y no puede cancelarse directamente.`);
+    }
+
+    const fromStatus = ticket.status;
+    const cancelNote = reason ? `Cancelado: ${reason}` : 'Cancelado sin motivo especificado';
+    const updatedNotes = ticket.notes ? `${ticket.notes} | ${cancelNote}` : cancelNote;
+
+    db.prepare(`
+      UPDATE tickets
+      SET status = 'CANCELADO',
+          notes = ?,
+          completed_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(updatedNotes, ticketId);
+
+    db.prepare(`
+      INSERT INTO ticket_events (ticket_id, from_status, to_status, user_id, counter_id, metadata)
+      VALUES (?, ?, 'CANCELADO', ?, ?, ?)
+    `).run(
+      ticketId,
+      fromStatus,
+      cancelledByUserId ? Number(cancelledByUserId) : null,
+      ticket.counter_id,
+      JSON.stringify({ reason, cancelledByUserId })
+    );
+
+    AuditService.log({
+      userId: cancelledByUserId,
+      action: 'CANCEL_UNCALLED_TICKET',
+      entity: 'TICKET',
+      entityId: ticketId,
+      details: {
+        ticket_number: ticket.ticket_number,
+        from_status: fromStatus,
+        reason
+      }
+    });
+
+    return {
+      success: true,
+      ticketId,
+      ticket_number: ticket.ticket_number,
+      message: `El turno ${ticket.ticket_number} ha sido cancelado exitosamente.`
+    };
+  }
+
 }
 
 module.exports = TicketService;

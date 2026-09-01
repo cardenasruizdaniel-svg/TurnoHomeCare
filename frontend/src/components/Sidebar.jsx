@@ -2,6 +2,7 @@ import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
+  Calendar,
   Ticket,
   Stethoscope,
   Grid3X3,
@@ -29,6 +30,7 @@ export function Sidebar() {
 
   const navItems = [
     { to: '/admin/dashboard',     label: 'Dashboard',              icon: LayoutDashboard },
+    { to: '/admin/programacion',  label: 'Programación de Turnos', icon: Calendar },
     { to: '/admin/turnos',        label: 'Historial de Turnos',     icon: Ticket },
     { to: '/admin/servicios',     label: 'Servicios Médicos',       icon: Stethoscope },
     { to: '/admin/modulos',       label: 'Módulos / Consultorios',  icon: Grid3X3 },

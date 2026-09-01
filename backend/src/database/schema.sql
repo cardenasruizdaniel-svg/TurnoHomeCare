@@ -124,9 +124,10 @@ CREATE TABLE IF NOT EXISTS tickets (
     counter_id INTEGER,
     user_id INTEGER,
     ticket_type TEXT NOT NULL DEFAULT 'NORMAL' CHECK(ticket_type IN ('NORMAL', 'PRIORITARIO', 'ESPECIAL')),
-    status TEXT NOT NULL DEFAULT 'ESPERANDO' CHECK(status IN ('ESPERANDO', 'LLAMADO', 'EN_ATENCION', 'FINALIZADO', 'NO_PRESENTO', 'CANCELADO', 'PAUSADO')),
+    status TEXT NOT NULL DEFAULT 'ESPERANDO' CHECK(status IN ('PROGRAMADO', 'CONFIRMADO', 'ESPERANDO', 'LLAMADO', 'EN_ATENCION', 'FINALIZADO', 'NO_PRESENTO', 'CANCELADO', 'PAUSADO')),
     sequence_number INTEGER NOT NULL,
     created_date TEXT NOT NULL, -- YYYY-MM-DD para reinicio diario
+    scheduled_date TEXT, -- YYYY-MM-DD para turnos programados a futuro
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     called_at DATETIME,
     attended_at DATETIME,

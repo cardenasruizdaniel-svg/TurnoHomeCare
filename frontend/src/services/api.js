@@ -104,5 +104,11 @@ export const api = {
   stopTunnel: () => request('/tunnel/stop', { method: 'POST' }),
 
   // Auditoría
-  getAuditLogs: (params) => request(`/audit?${new URLSearchParams(params || {}).toString()}`)
+  getAuditLogs: (params) => request(`/audit?${new URLSearchParams(params || {}).toString()}`),
+
+  // Programación de Turnos y Edición/Cancelación Directa
+  getSchedule: (params) => request(`/schedule?${new URLSearchParams(params || {}).toString()}`),
+  createSchedule: (payload) => request('/schedule', { method: 'POST', body: JSON.stringify(payload) }),
+  editUncalledTicket: (id, payload) => request(`/tickets/${id}/edit-uncalled`, { method: 'PUT', body: JSON.stringify(payload) }),
+  cancelUncalledTicket: (id, reason) => request(`/tickets/${id}/cancel-uncalled`, { method: 'POST', body: JSON.stringify({ reason }) })
 };

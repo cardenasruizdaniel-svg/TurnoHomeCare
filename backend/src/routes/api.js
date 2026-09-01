@@ -55,6 +55,12 @@ router.post('/tickets/:id/transfer', authenticateToken, TicketController.transfe
 router.post('/tickets/:id/no-show', authenticateToken, TicketController.markNoShow);
 router.post('/tickets/:id/pause', authenticateToken, TicketController.pause);
 
+// Programación de turnos y modificación directa sin llamar
+router.get('/schedule', authenticateToken, TicketController.getSchedule);
+router.post('/schedule', authenticateToken, TicketController.createSchedule);
+router.put('/tickets/:id/edit-uncalled', authenticateToken, TicketController.editUncalled);
+router.post('/tickets/:id/cancel-uncalled', authenticateToken, TicketController.cancelUncalled);
+
 // -------------------------------------------------------------
 // 4. RUTAS DE ADMINISTRACIÓN Y SUPERVISIÓN (Protegidas)
 // -------------------------------------------------------------
