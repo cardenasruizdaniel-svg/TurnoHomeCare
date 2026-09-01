@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   UserCheck,
+  Trash2,
   PhoneCall,
   CheckCircle,
   UserX,
@@ -53,6 +54,7 @@ export function StaffDeskView() {
   // Modal para finalizar con notas
   const [isFinishModalOpen, setIsFinishModalOpen] = useState(false);
   const [attentionNotes, setAttentionNotes] = useState('');
+  const [cancelModal, setCancelModal] = useState({ isOpen: false, ticket: null, reason: '' });
 
   // Modal para Derivar / Transferir Turno a Consultorio
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
@@ -190,6 +192,27 @@ export function StaffDeskView() {
   };
 
   // 2. RE-LLAMAR
+  
+  const handleConfirmCancelQueue = async () => {
+    if (!cancelModal.ticket) return;
+    setActionLoading(true);
+    setErrorMsg('');
+    try {
+      const res = await api.cancelUncalledTicket(cancelModal.ticket.id, {
+        reason: cancelModal.reason || 'Eliminado desde la cola por el funcionario'
+      });
+      if (res.success) {
+        setSuccessMsg(`Turno ${cancelModal.ticket.ticket_number} eliminado / cancelado correctamente.`);
+        setCancelModal({ isOpen: false, ticket: null, reason: '' });
+        loadQueueAndStatus();
+      }
+    } catch (err) {
+      setErrorMsg(err.message || 'Error al eliminar turno');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const handleRecall = async () => {
     if (!currentTicket) return;
     setActionLoading(true);
@@ -884,7 +907,22 @@ export function StaffDeskView() {
                               <span className="text-[10px] text-slate-500 font-medium">Turno Regular</span>
                             )}
                           </div>
-                          <StatusBadge status={t.status} />
+                          <div className="flex items-center gap-2">
+                            <StatusBadge status={t.status} />
+                            {isWaiting && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setCancelModal({ isOpen: true, ticket: t, reason: '' });
+                                }}
+                                className="p-1 rounded-lg bg-rose-500/15 hover:bg-rose-600 text-rose-400 hover:text-white border border-rose-500/30 transition cursor-pointer"
+                                title="Eliminar / Cancelar turno de la cola"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
                         </div>
 
                         <div className="flex items-center justify-between pt-1 border-t border-slate-800/60 text-xs">
@@ -973,12 +1011,27 @@ export function StaffDeskView() {
                         )}
                       </div>
 
-                      <div className="text-right">
+                      <div className="flex items-center gap-1.5">
                         <button
                           type="button"
-                          className="px-3 py-1.5 rounded-xl bg-slate-800 group-hover:bg-sky-600 text-slate-300 group-hover:text-white text-xs font-bold transition shadow"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCallNext(t.id);
+                          }}
+                          className="px-3 py-1.5 rounded-xl bg-slate-800 group-hover:bg-sky-600 text-slate-300 group-hover:text-white text-xs font-bold transition shadow cursor-pointer"
                         >
                           Llamar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setCancelModal({ isOpen: true, ticket: t, reason: '' });
+                          }}
+                          className="p-2 rounded-xl bg-rose-500/15 hover:bg-rose-600 text-rose-400 hover:text-white border border-rose-500/30 transition cursor-pointer"
+                          title="Eliminar / Cancelar este turno directamente de la cola"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </div>
@@ -1324,6 +1377,62 @@ export function StaffDeskView() {
           </form>
         )}
       </Modal>
+
+
+      {/* Modal de Cancelación Directa de Turno en Cola */}
+      {cancelModal.isOpen && cancelModal.ticket && (
+        <Modal
+          isOpen={cancelModal.isOpen}
+          onClose={() => setCancelModal({ isOpen: false, ticket: null, reason: '' })}
+          title={`Eliminar / Cancelar Turno: ${cancelModal.ticket.ticket_number}`}
+        >
+          <div className="space-y-4 text-xs">
+            <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-300 space-y-2">
+              <p className="font-extrabold text-sm flex items-center gap-2">
+                <Trash2 className="w-4 h-4 text-rose-400" />
+                Eliminación Directa Sin Llamar
+              </p>
+              <p className="text-slate-300">
+                Vas a eliminar el turno <strong className="font-mono text-white text-sm">{cancelModal.ticket.ticket_number}</strong> del paciente <strong className="text-white">{cancelModal.ticket.patient_name}</strong> (C.C. {cancelModal.ticket.document_number}).
+              </p>
+              <p className="text-slate-400 text-[11px]">
+                No es necesario llamar al paciente para cancelarlo. El turno cambiará a estado <strong>CANCELADO</strong> en la auditoría.
+              </p>
+            </div>
+
+            <div>
+              <label className="block font-bold text-slate-300 mb-1">Motivo de Cancelación / Eliminación *</label>
+              <textarea
+                rows="3"
+                required
+                placeholder="Ejemplo: Paciente se retiró de la sala, Reprogramación telefónica, Turno duplicado..."
+                value={cancelModal.reason}
+                onChange={(e) => setCancelModal({ ...cancelModal, reason: e.target.value })}
+                className="w-full p-3 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-rose-500"
+              />
+            </div>
+
+            <div className="flex gap-3 justify-end pt-3 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setCancelModal({ isOpen: false, ticket: null, reason: '' })}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold transition"
+              >
+                Volver
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmCancelQueue}
+                disabled={actionLoading}
+                className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold shadow-lg shadow-rose-600/30 transition flex items-center gap-2"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Eliminar Turno Definitivamente</span>
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
 
     </div>
   );
