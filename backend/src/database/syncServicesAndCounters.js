@@ -1,4 +1,5 @@
 const db = require("../config/database");
+const bcrypt = require("bcryptjs");
 
 const officialServices = [
   {
@@ -255,8 +256,47 @@ async function syncServicesAndCounters() {
         .run(JSON.stringify(officialBanners));
     }
 
+    // 5. Sincronización Automática de Usuarios Oficiales (Admin Ing. Daniel Cárdenas Ruiz + 1 usuario por módulo)
+    const passwordHash = bcrypt.hashSync('Home2026*', 10);
+    const officialUsernames = ['admin', 'Consultorio1', 'Ventanilla1', 'Ventanilla2', 'Entrevista1', 'Entrevista2'];
+
+    db.exec("UPDATE tickets SET user_id = 1 WHERE user_id IS NOT NULL AND user_id NOT IN (1,2,3,4,5,6);");
+    db.exec("UPDATE ticket_events SET user_id = 1 WHERE user_id IS NOT NULL AND user_id NOT IN (1,2,3,4,5,6);");
+    db.exec("UPDATE audit_logs SET user_id = 1 WHERE user_id IS NOT NULL AND user_id NOT IN (1,2,3,4,5,6);");
+
+    const userPlaceholders = officialUsernames.map(() => '?').join(',');
+    db.prepare(`DELETE FROM users WHERE username NOT IN (${userPlaceholders})`).run(...officialUsernames);
+
+    const existingAdmin = db.prepare("SELECT id FROM users WHERE username = 'admin'").get();
+    if (existingAdmin) {
+      db.prepare("UPDATE users SET full_name = 'Ing. Daniel Cárdenas Ruiz', role_id = 1, password_hash = ?, is_active = 1 WHERE id = ?")
+        .run(passwordHash, existingAdmin.id);
+    } else {
+      db.prepare("INSERT INTO users (id, branch_id, role_id, username, email, password_hash, full_name, is_active) VALUES (1, 1, 1, 'admin', 'admin@homecare.com', ?, 'Ing. Daniel Cárdenas Ruiz', 1)")
+        .run(passwordHash);
+    }
+
+    const moduleUserDefs = [
+      { id: 2, username: 'Consultorio1', name: 'Consultorio 1' },
+      { id: 3, username: 'Ventanilla1',  name: 'Ventanilla 1' },
+      { id: 4, username: 'Ventanilla2',  name: 'Ventanilla 2' },
+      { id: 5, username: 'Entrevista1',  name: 'Entrevista 1' },
+      { id: 6, username: 'Entrevista2',  name: 'Entrevista 2' }
+    ];
+
+    for (const m of moduleUserDefs) {
+      const existing = db.prepare("SELECT id FROM users WHERE username = ?").get(m.username);
+      if (existing) {
+        db.prepare("UPDATE users SET full_name = ?, role_id = 3, password_hash = ?, is_active = 1 WHERE id = ?")
+          .run(m.name, passwordHash, existing.id);
+      } else {
+        db.prepare("INSERT INTO users (id, branch_id, role_id, username, email, password_hash, full_name, is_active) VALUES (?, 1, 3, ?, ?, ?, ?, 1)")
+          .run(m.id, m.username, `${m.username.toLowerCase()}@homecare.com`, passwordHash, m.name);
+      }
+    }
+
     if (db.persistToDisk) db.persistToDisk();
-    console.log("Verificación de datos iniciales completada (datos de usuario preservados).");
+    console.log("Sincronización completa: Servicios, Módulos y Usuarios Oficiales (Admin Ing. Daniel Cárdenas Ruiz + 5 Módulos).");
   } catch (err) {
     console.error("Error sincronizando servicios y modulos:", err);
   }
