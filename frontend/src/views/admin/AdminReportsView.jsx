@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { FileText, Download, Printer, TrendingUp, Users, Clock, Stethoscope, CheckCircle2 } from 'lucide-react';
 import { api } from '../../services/api';
+import { useTheme } from '../../context/ThemeContext';
 import { LoadingSpinner } from '../../components/Modal';
 
 export function AdminReportsView() {
+  const { isDark } = useTheme();
+  const d = isDark;
   const [stats, setStats] = useState(null);
   const [branches, setBranches] = useState([]);
   const [selectedBranchId, setSelectedBranchId] = useState('');
@@ -44,8 +47,8 @@ export function AdminReportsView() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black font-display text-white">Reportes y Analítica</h1>
-          <p className="text-xs text-slate-400">Generación de informes de productividad, servicio y tiempos de atención</p>
+          <h1 className={`text-2xl font-black font-display ${d ? "text-white" : "text-slate-900"}`}>Reportes y Analítica</h1>
+          <p className={`text-xs ${d ? "text-slate-400" : "text-slate-600"}`}>Generación de informes de productividad, servicio y tiempos de atención</p>
         </div>
 
         <div className="flex items-center gap-3">

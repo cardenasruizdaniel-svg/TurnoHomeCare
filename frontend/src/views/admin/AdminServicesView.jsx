@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Stethoscope, Plus, Edit, Trash2, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import { api } from '../../services/api';
+import { useTheme } from '../../context/ThemeContext';
 import { Modal, LoadingSpinner } from '../../components/Modal';
 
 export function AdminServicesView() {
+  const { isDark } = useTheme();
+  const d = isDark;
   const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
@@ -116,8 +119,8 @@ export function AdminServicesView() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black font-display text-white">Servicios y Tipos de Consulta</h1>
-          <p className="text-xs text-slate-400">Administra las especialidades médicas, letras de turno y tiempos estimados</p>
+          <h1 className={`text-2xl font-black font-display ${d ? "text-white" : "text-slate-900"}`}>Servicios y Tipos de Consulta</h1>
+          <p className={`text-xs ${d ? "text-slate-400" : "text-slate-600"}`}>Administra las especialidades médicas, letras de turno y tiempos estimados</p>
         </div>
 
         <button

@@ -1,9 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Grid3X3, Plus, Edit, Trash2, Stethoscope, AlertCircle, Building2, CheckCircle2 } from 'lucide-react';
 import { api } from '../../services/api';
+import { useTheme } from '../../context/ThemeContext';
 import { Modal, LoadingSpinner } from '../../components/Modal';
 
 export function AdminCountersView() {
+  const { isDark } = useTheme();
+  const d = isDark;
   const [counters, setCounters] = useState([]);
   const [services, setServices] = useState([]);
   const [branches, setBranches] = useState([]);
@@ -122,8 +125,8 @@ export function AdminCountersView() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black font-display text-white">Módulos, Consultorios y Ventanillas</h1>
-          <p className="text-xs text-slate-400">Configuración de puntos de atención física y servicios asignados</p>
+          <h1 className={`text-2xl font-black font-display ${d ? "text-white" : "text-slate-900"}`}>Módulos, Consultorios y Ventanillas</h1>
+          <p className={`text-xs ${d ? "text-slate-400" : "text-slate-600"}`}>Configuración de puntos de atención física y servicios asignados</p>
         </div>
 
         <button

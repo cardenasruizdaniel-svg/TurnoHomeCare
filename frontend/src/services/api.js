@@ -105,6 +105,7 @@ export const api = {
 
   // Auditoría
   getAuditLogs: (params) => request(`/audit?${new URLSearchParams(params || {}).toString()}`),
+  syncOfficialData: () => request('/settings/sync-official-data', { method: 'POST' }),
 
   // Programación de Turnos y Edición/Cancelación Directa
   getSchedule: (params) => request(`/schedule?${new URLSearchParams(params || {}).toString()}`),

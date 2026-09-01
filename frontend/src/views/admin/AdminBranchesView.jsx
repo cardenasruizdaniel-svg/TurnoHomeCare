@@ -2,9 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { Building2, Plus, Edit, Trash2, QrCode, Download, Printer, ExternalLink, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { api } from '../../services/api';
+import { useTheme } from '../../context/ThemeContext';
 import { Modal, LoadingSpinner } from '../../components/Modal';
 
 export function AdminBranchesView() {
+  const { isDark } = useTheme();
+  const d = isDark;
   const [branches, setBranches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
@@ -109,8 +112,8 @@ export function AdminBranchesView() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black font-display text-white">Sedes Físicas y Códigos QR</h1>
-          <p className="text-xs text-slate-400">Multi-sede, horarios de atención y descarga de pósters QR para impresión</p>
+          <h1 className={`text-2xl font-black font-display ${d ? "text-white" : "text-slate-900"}`}>Sedes Físicas y Códigos QR</h1>
+          <p className={`text-xs ${d ? "text-slate-400" : "text-slate-600"}`}>Multi-sede, horarios de atención y descarga de pósters QR para impresión</p>
         </div>
 
         <button

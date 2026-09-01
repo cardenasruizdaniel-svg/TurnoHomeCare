@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { History, ShieldAlert, Filter, Calendar, User, Search } from 'lucide-react';
 import { api } from '../../services/api';
+import { useTheme } from '../../context/ThemeContext';
 import { LoadingSpinner } from '../../components/Modal';
 
 export function AdminAuditView() {
+  const { isDark } = useTheme();
+  const d = isDark;
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionFilter, setActionFilter] = useState('');
@@ -33,8 +36,8 @@ export function AdminAuditView() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black font-display text-white">Registro de Auditoría</h1>
-          <p className="text-xs text-slate-400">Trazabilidad inmutable de llamados, cambios de configuración y accesos</p>
+          <h1 className={`text-2xl font-black font-display ${d ? "text-white" : "text-slate-900"}`}>Registro de Auditoría</h1>
+          <p className={`text-xs ${d ? "text-slate-400" : "text-slate-600"}`}>Trazabilidad inmutable de llamados, cambios de configuración y accesos</p>
         </div>
 
         <select
@@ -52,13 +55,13 @@ export function AdminAuditView() {
       </div>
 
       {/* Audit Logs Table */}
-      <div className="rounded-3xl bg-slate-900 border border-slate-800 shadow-xl overflow-hidden">
+      <div className={`rounded-3xl border shadow-xl overflow-hidden ${d ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200 shadow-slate-200/50 text-slate-900"}`}>
         {loading ? (
           <LoadingSpinner text="Cargando registro de auditoría..." />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-slate-950/80 text-slate-400 uppercase font-semibold border-b border-slate-800">
+              <thead className={`uppercase font-bold border-b ${d ? "bg-slate-950/80 text-slate-400 border-slate-800" : "bg-slate-100/90 text-slate-700 border-slate-200"}`}>
                 <tr>
                   <th className="py-3.5 px-4">Fecha y Hora</th>
                   <th className="py-3.5 px-4">Acción</th>

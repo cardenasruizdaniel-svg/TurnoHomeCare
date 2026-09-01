@@ -13,10 +13,13 @@ import {
   UserCheck
 } from 'lucide-react';
 import { api } from '../../services/api';
+import { useTheme } from '../../context/ThemeContext';
 import { StatusBadge, TypeBadge } from '../../components/StatusBadge';
 import { Modal, LoadingSpinner } from '../../components/Modal';
 
 export function AdminTicketsView() {
+  const { isDark } = useTheme();
+  const d = isDark;
   const [tickets, setTickets] = useState([]);
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -100,8 +103,8 @@ export function AdminTicketsView() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black font-display text-white">Historial General de Turnos</h1>
-          <p className="text-xs text-slate-400">Consulta detallada, tiempos de espera, atención y trazabilidad</p>
+          <h1 className={`text-2xl font-black font-display ${d ? "text-white" : "text-slate-900"}`}>Historial General de Turnos</h1>
+          <p className={`text-xs ${d ? "text-slate-400" : "text-slate-600"}`}>Consulta detallada, tiempos de espera, atención y trazabilidad</p>
         </div>
 
         <div className="flex items-center gap-3">
@@ -212,13 +215,13 @@ export function AdminTicketsView() {
       </div>
 
       {/* Table */}
-      <div className="rounded-3xl bg-slate-900 border border-slate-800 shadow-xl overflow-hidden">
+      <div className={`rounded-3xl border shadow-xl overflow-hidden ${d ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200 shadow-slate-200/50 text-slate-900"}`}>
         {loading ? (
           <LoadingSpinner text="Cargando historial de turnos..." />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-slate-950/80 text-slate-400 uppercase font-semibold border-b border-slate-800">
+              <thead className={`uppercase font-bold border-b ${d ? "bg-slate-950/80 text-slate-400 border-slate-800" : "bg-slate-100/90 text-slate-700 border-slate-200"}`}>
                 <tr>
                   <th className="py-3.5 px-4">Turno</th>
                   <th className="py-3.5 px-4">Tipo</th>

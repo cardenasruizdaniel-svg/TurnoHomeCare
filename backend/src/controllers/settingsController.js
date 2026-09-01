@@ -135,6 +135,20 @@ class SettingsController {
       res.status(500).json({ success: false, error: err.message });
     }
   }
+
+  static syncOfficialData(req, res) {
+    try {
+      const syncServicesAndCounters = require('../database/syncServicesAndCounters');
+      syncServicesAndCounters();
+      res.json({
+        success: true,
+        message: 'Base de datos y usuarios oficiales sincronizados exitosamente (Admin: Ing. Daniel Cárdenas Ruiz y 5 usuarios de módulo).'
+      });
+    } catch (err) {
+      console.error('Error sincronizando datos oficiales:', err);
+      res.status(500).json({ success: false, error: err.message });
+    }
+  }
 }
 
 module.exports = SettingsController;

@@ -26,10 +26,13 @@ import {
   ShieldCheck
 } from 'lucide-react';
 import { api } from '../../services/api';
+import { useTheme } from '../../context/ThemeContext';
 import { useBranding } from '../../context/BrandingContext';
 import { LoadingSpinner } from '../../components/Modal';
 
 export function AdminSettingsView() {
+  const { isDark } = useTheme();
+  const d = isDark;
   const { refreshBranding } = useBranding();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -461,8 +464,8 @@ export function AdminSettingsView() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black font-display text-white">Configuración del Sistema</h1>
-          <p className="text-xs text-slate-400">Reglas de negocio, proporción de atención, síntesis de voz y branding institucional</p>
+          <h1 className={`text-2xl font-black font-display ${d ? "text-white" : "text-slate-900"}`}>Configuración del Sistema</h1>
+          <p className={`text-xs ${d ? "text-slate-400" : "text-slate-600"}`}>Reglas de negocio, proporción de atención, síntesis de voz y branding institucional</p>
         </div>
 
         <button
@@ -598,7 +601,7 @@ export function AdminSettingsView() {
               </div>
               <div>
                 <h3 className="font-bold font-display text-white text-sm">Reglas de Prioridad y Despacho de Turnos</h3>
-                <p className="text-xs text-slate-400">Configura la edad mínima de adulto mayor y la proporción de atención</p>
+                <p className={`text-xs ${d ? "text-slate-400" : "text-slate-600"}`}>Configura la edad mínima de adulto mayor y la proporción de atención</p>
               </div>
             </div>
 
@@ -731,7 +734,7 @@ export function AdminSettingsView() {
                 </div>
                 <div>
                   <h3 className="font-bold font-display text-white text-sm">Publicidad, Banners y Marquesina en Pantalla TV</h3>
-                  <p className="text-xs text-slate-400">Configura los anuncios rotativos con fotos, mensajes institucionales y la marquesina animada</p>
+                  <p className={`text-xs ${d ? "text-slate-400" : "text-slate-600"}`}>Configura los anuncios rotativos con fotos, mensajes institucionales y la marquesina animada</p>
                 </div>
               </div>
 
@@ -932,7 +935,7 @@ export function AdminSettingsView() {
               </div>
               <div>
                 <h3 className="font-bold font-display text-white text-sm">Sonido y Locución en Pantallas de TV</h3>
-                <p className="text-xs text-slate-400">Configura la campana de llamado y el texto que pronunciará la voz</p>
+                <p className={`text-xs ${d ? "text-slate-400" : "text-slate-600"}`}>Configura la campana de llamado y el texto que pronunciará la voz</p>
               </div>
             </div>
 
@@ -987,7 +990,7 @@ export function AdminSettingsView() {
                 </div>
                 <div>
                   <h3 className="font-bold font-display text-white text-sm">Identidad Visual y Personalización de Empresa</h3>
-                  <p className="text-xs text-slate-400">Configura el logo oficial, nombre, eslogan y paleta cromática de la institución</p>
+                  <p className={`text-xs ${d ? "text-slate-400" : "text-slate-600"}`}>Configura el logo oficial, nombre, eslogan y paleta cromática de la institución</p>
                 </div>
               </div>
 
@@ -1195,7 +1198,7 @@ export function AdminSettingsView() {
                 </div>
                 <div>
                   <h2 className="text-lg font-bold font-display text-white">PROTECCIÓN Y COPIAS DE SEGURIDAD</h2>
-                  <p className="text-xs text-slate-400">Garantía de cero pérdida de datos y respaldos descargables en cualquier momento.</p>
+                  <p className={`text-xs ${d ? "text-slate-400" : "text-slate-600"}`}>Garantía de cero pérdida de datos y respaldos descargables en cualquier momento.</p>
                 </div>
               </div>
               <span className="px-3 py-1 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 text-xs font-bold flex items-center gap-1.5">

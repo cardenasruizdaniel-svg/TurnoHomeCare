@@ -13,18 +13,22 @@ import {
   AlertTriangle, 
   History, 
   Lock,
-  Building2
+  Building2,
+  RefreshCw
 } from 'lucide-react';
 import { api } from '../../services/api';
+import { useTheme } from '../../context/ThemeContext';
 import { Modal, LoadingSpinner } from '../../components/Modal';
 
 export function AdminUsersView() {
+  const { isDark } = useTheme();
   const [users, setUsers] = useState([]);
   const [roles, setRoles] = useState([]);
   const [branches, setBranches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [syncingData, setSyncingData] = useState(false);
 
   // Modal Crear / Editar
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -45,7 +49,7 @@ export function AdminUsersView() {
     user: null,
     loadingCheck: false,
     isDeleting: false,
-    movements: null // { hasMovements, ticketsCount, eventsCount }
+    movements: null
   });
 
   const [togglingId, setTogglingId] = useState(null);
@@ -72,6 +76,23 @@ export function AdminUsersView() {
     loadData();
   }, []);
 
+  // Forzar sincronización de datos y usuarios oficiales en servidor (Render)
+  const handleForceSync = async () => {
+    try {
+      setSyncingData(true);
+      setErrorMsg('');
+      const res = await api.syncOfficialData();
+      if (res.success) {
+        setSuccessMsg(res.message);
+        loadData();
+      }
+    } catch (err) {
+      setErrorMsg(err.message || 'Error sincronizando usuarios');
+    } finally {
+      setSyncingData(false);
+    }
+  };
+
   const openCreateModal = () => {
     setEditingUser(null);
     setFormData({
@@ -93,7 +114,7 @@ export function AdminUsersView() {
       username: user.username,
       full_name: user.full_name,
       email: user.email || '',
-      password: '', // Dejar en blanco para no cambiar
+      password: '',
       role_id: user.role_id,
       branch_id: user.branch_id || (branches[0]?.id || 1),
       is_active: user.is_active !== undefined ? user.is_active : 1
@@ -120,7 +141,6 @@ export function AdminUsersView() {
     }
   };
 
-  // Activar / Inactivar usuario con 1 clic
   const handleToggleActive = async (user) => {
     setTogglingId(user.id);
     setErrorMsg('');
@@ -138,7 +158,6 @@ export function AdminUsersView() {
     }
   };
 
-  // Abrir modal de eliminación con verificación de movimientos
   const openDeleteModal = async (user) => {
     setErrorMsg('');
     setDeleteModal({
@@ -165,7 +184,6 @@ export function AdminUsersView() {
     }
   };
 
-  // Ejecutar eliminación permanente
   const confirmDeleteUser = async () => {
     if (!deleteModal.user) return;
     setDeleteModal(prev => ({ ...prev, isDeleting: true }));
@@ -187,7 +205,6 @@ export function AdminUsersView() {
     }
   };
 
-  // Inactivar desde el modal cuando no se puede borrar
   const handleInactivateFromModal = async () => {
     if (!deleteModal.user) return;
     try {
@@ -202,48 +219,74 @@ export function AdminUsersView() {
     }
   };
 
+  const d = isDark;
+
   return (
     <div className="space-y-6">
       
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black font-display text-white">Usuarios y Funcionarios</h1>
-          <p className="text-xs text-slate-400">Control de acceso, operadores de consultorio/ventanilla, supervisores y administradores</p>
+          <h1 className={`text-2xl sm:text-3xl font-black font-display flex items-center gap-3 ${d ? 'text-white' : 'text-slate-900'}`}>
+            <Users className="w-7 h-7 text-sky-500" />
+            Usuarios y Funcionarios
+          </h1>
+          <p className={`text-xs sm:text-sm mt-1 ${d ? 'text-slate-400' : 'text-slate-600'}`}>
+            Control de acceso, operadores de consultorio/ventanilla, supervisores y administradores
+          </p>
         </div>
 
-        <button
-          onClick={openCreateModal}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold shadow-lg shadow-sky-600/20 transition cursor-pointer"
-        >
-          <Plus className="w-4 h-4" />
-          <span>+ Nuevo Funcionario / Usuario</span>
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={handleForceSync}
+            disabled={syncingData}
+            title="Sincronizar y resetear usuarios oficiales (Admin Daniel Cárdenas + 5 Módulos)"
+            className={`px-3.5 py-2.5 rounded-xl border text-xs font-bold transition flex items-center gap-2 ${
+              d ? 'bg-slate-900 border-slate-800 text-teal-400 hover:bg-slate-800' : 'bg-white border-slate-300 text-teal-700 hover:bg-slate-50 shadow-sm'
+            }`}
+          >
+            <RefreshCw className={`w-4 h-4 ${syncingData ? 'animate-spin text-teal-500' : ''}`} />
+            <span className="hidden sm:inline">Restablecer Usuarios Oficiales</span>
+          </button>
+
+          <button
+            onClick={openCreateModal}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold shadow-lg shadow-sky-600/20 transition cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>+ Nuevo Funcionario / Usuario</span>
+          </button>
+        </div>
       </div>
 
       {/* Alertas */}
       {errorMsg && (
-        <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-3">
-          <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
+        <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-500 text-xs flex items-center gap-3">
+          <AlertCircle className="w-5 h-5 shrink-0" />
           <span>{errorMsg}</span>
         </div>
       )}
 
       {successMsg && (
-        <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-3">
-          <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+        <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 text-xs flex items-center gap-3">
+          <CheckCircle2 className="w-5 h-5 shrink-0" />
           <span>{successMsg}</span>
         </div>
       )}
 
       {/* Users Table */}
-      <div className="rounded-3xl bg-slate-900 border border-slate-800 shadow-xl overflow-hidden">
+      <div className={`rounded-3xl border shadow-xl overflow-hidden transition-colors duration-300 ${
+        d ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-slate-200/50 text-slate-900'
+      }`}>
         {loading ? (
           <LoadingSpinner text="Cargando usuarios..." />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-slate-950/80 text-slate-400 uppercase font-semibold border-b border-slate-800">
+              <thead className={`uppercase font-bold tracking-wider border-b ${
+                d ? 'bg-slate-950/80 text-slate-400 border-slate-800' : 'bg-slate-100/90 text-slate-700 border-slate-200'
+              }`}>
                 <tr>
                   <th className="py-3.5 px-4">Nombre Completo</th>
                   <th className="py-3.5 px-4">Usuario</th>
@@ -254,44 +297,46 @@ export function AdminUsersView() {
                   <th className="py-3.5 px-4 text-right">Acciones</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800 text-slate-300">
+              <tbody className={`divide-y ${d ? 'divide-slate-800/50 text-slate-300' : 'divide-slate-100 text-slate-800'}`}>
                 {users.map((u) => {
                   const isActive = u.is_active === 1 || u.is_active === true;
                   const isToggling = togglingId === u.id;
 
                   return (
-                    <tr key={u.id} className={`hover:bg-slate-800/40 transition ${!isActive ? 'opacity-65 bg-slate-950/30' : ''}`}>
-                      <td className="py-3.5 px-4 font-bold text-white">
+                    <tr key={u.id} className={`transition ${
+                      d ? 'hover:bg-slate-800/40' : 'hover:bg-slate-50'
+                    } ${!isActive ? (d ? 'opacity-65 bg-slate-950/30' : 'opacity-65 bg-slate-100/50') : ''}`}>
+                      <td className={`py-3.5 px-4 font-extrabold ${d ? 'text-white' : 'text-slate-900'}`}>
                         <div className="flex items-center gap-2">
                           <span>{u.full_name}</span>
                           {!isActive && (
-                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30 uppercase">
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-500/20 text-rose-500 border border-rose-500/30 uppercase">
                               Inactivo
                             </span>
                           )}
                         </div>
                       </td>
-                      <td className="py-3.5 px-4 font-mono text-sky-400 font-bold">
+                      <td className="py-3.5 px-4 font-mono text-sky-500 font-black">
                         {u.username}
                       </td>
                       <td className="py-3.5 px-4">
                         <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${
                           u.role_name === 'ADMIN'
-                            ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
+                            ? (d ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30' : 'bg-indigo-100 text-indigo-800 border border-indigo-200')
                             : u.role_name === 'SUPERVISOR'
-                            ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                            : 'bg-teal-500/20 text-teal-300 border border-teal-500/30'
+                            ? (d ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : 'bg-amber-100 text-amber-800 border border-amber-200')
+                            : (d ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30' : 'bg-teal-100 text-teal-800 border border-teal-200')
                         }`}>
                           {u.role_name}
                         </span>
                       </td>
-                      <td className="py-3.5 px-4 text-slate-300">
+                      <td className={`py-3.5 px-4 ${d ? 'text-slate-300' : 'text-slate-700'}`}>
                         <div className="flex items-center gap-1.5">
-                          <Building2 className="w-3.5 h-3.5 text-slate-500" />
+                          <Building2 className="w-3.5 h-3.5 text-slate-400" />
                           <span>{u.branch_name || 'Global'}</span>
                         </div>
                       </td>
-                      <td className="py-3.5 px-4 text-slate-400">
+                      <td className={`py-3.5 px-4 ${d ? 'text-slate-400' : 'text-slate-500'}`}>
                         {u.email || 'N/A'}
                       </td>
                       <td className="py-3.5 px-4">
@@ -300,48 +345,49 @@ export function AdminUsersView() {
                           onClick={() => handleToggleActive(u)}
                           disabled={isToggling}
                           title={isActive ? "Haga clic para Inactivar usuario" : "Haga clic para Activar usuario"}
-                          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold transition cursor-pointer ${
+                          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold transition cursor-pointer border ${
                             isActive 
-                              ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/25' 
-                              : 'bg-rose-500/15 text-rose-400 border border-rose-500/30 hover:bg-rose-500/25'
+                              ? (d ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/25' : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100')
+                              : (d ? 'bg-rose-500/15 text-rose-400 border-rose-500/30 hover:bg-rose-500/25' : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100')
                           }`}
                         >
-                          <span className={`w-2 h-2 rounded-full ${isActive ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'}`}></span>
+                          <span className={`w-2 h-2 rounded-full ${isActive ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`}></span>
                           <span>{isToggling ? 'Cambiando...' : isActive ? 'Activo' : 'Inactivo'}</span>
                         </button>
                       </td>
                       <td className="py-3.5 px-4 text-right">
                         <div className="flex items-center justify-end gap-1.5">
-                          {/* Botón Editar */}
                           <button
                             type="button"
                             onClick={() => openEditModal(u)}
-                            className="p-2 rounded-xl bg-slate-800 hover:bg-sky-600 text-slate-300 hover:text-white transition cursor-pointer"
+                            className={`p-2 rounded-xl transition cursor-pointer border ${
+                              d ? 'bg-slate-800 border-slate-700 hover:bg-sky-600 text-slate-300 hover:text-white' : 'bg-slate-100 border-slate-200 hover:bg-sky-500 text-slate-700 hover:text-white'
+                            }`}
                             title="Editar usuario"
                           >
                             <Edit className="w-3.5 h-3.5" />
                           </button>
 
-                          {/* Botón Inactivar / Activar */}
                           <button
                             type="button"
                             onClick={() => handleToggleActive(u)}
                             disabled={isToggling}
-                            className={`p-2 rounded-xl transition cursor-pointer ${
+                            className={`p-2 rounded-xl transition cursor-pointer border ${
                               isActive 
-                                ? 'bg-slate-800 hover:bg-amber-600 text-amber-300 hover:text-white' 
-                                : 'bg-slate-800 hover:bg-emerald-600 text-emerald-300 hover:text-white'
+                                ? (d ? 'bg-amber-500/15 hover:bg-amber-500/30 text-amber-400 border-amber-500/30' : 'bg-amber-50 hover:bg-amber-100 text-amber-700 border-amber-200')
+                                : (d ? 'bg-emerald-500/15 hover:bg-emerald-500/30 text-emerald-400 border-emerald-500/30' : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200')
                             }`}
-                            title={isActive ? "Inactivar Usuario" : "Activar Usuario"}
+                            title={isActive ? "Inactivar usuario" : "Activar usuario"}
                           >
                             <Power className="w-3.5 h-3.5" />
                           </button>
 
-                          {/* Botón Eliminar con comprobación de movimientos */}
                           <button
                             type="button"
                             onClick={() => openDeleteModal(u)}
-                            className="p-2 rounded-xl bg-slate-800 hover:bg-rose-600 text-rose-400 hover:text-white transition cursor-pointer"
+                            className={`p-2 rounded-xl transition cursor-pointer border ${
+                              d ? 'bg-rose-500/15 hover:bg-rose-600 text-rose-400 hover:text-white border-rose-500/30' : 'bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white border-rose-200'
+                            }`}
                             title="Eliminar usuario"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -358,208 +404,185 @@ export function AdminUsersView() {
       </div>
 
       {/* Modal Crear / Editar Usuario */}
-      <Modal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        title={editingUser ? `Editar Usuario: ${editingUser.username}` : 'Crear Nuevo Usuario'}
-      >
-        <form onSubmit={handleSave} className="space-y-4 text-xs">
-          <div className="space-y-1">
-            <label className="font-bold text-slate-300">Nombre Completo</label>
-            <input
-              type="text"
-              required
-              placeholder="Ej: Dr. Roberto Gómez"
-              value={formData.full_name}
-              onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
-              className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white focus:outline-none focus:border-sky-500"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <label className="font-bold text-slate-300">Nombre de Usuario (Login)</label>
+      {isModalOpen && (
+        <Modal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          title={editingUser ? `Editar Usuario: ${editingUser.full_name}` : 'Crear Nuevo Usuario / Funcionario'}
+        >
+          <form onSubmit={handleSave} className="space-y-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-400 mb-1">Nombre Completo *</label>
               <input
                 type="text"
                 required
-                disabled={!!editingUser}
-                placeholder="Ej: rgomez"
-                value={formData.username}
-                onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white focus:outline-none focus:border-sky-500 disabled:opacity-50"
+                value={formData.full_name}
+                onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+                className={`w-full px-3 py-2 rounded-xl text-xs font-bold border ${d ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'}`}
               />
             </div>
 
-            <div className="space-y-1">
-              <label className="font-bold text-slate-300">
-                {editingUser ? 'Nueva Contraseña (opcional)' : 'Contraseña'}
-              </label>
-              <input
-                type="password"
-                required={!editingUser}
-                placeholder={editingUser ? 'Dejar en blanco para no cambiar' : '••••••••'}
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white focus:outline-none focus:border-sky-500"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <label className="font-bold text-slate-300">Rol de Usuario</label>
-              <select
-                value={formData.role_id}
-                onChange={(e) => setFormData({ ...formData, role_id: Number(e.target.value) })}
-                className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white focus:outline-none focus:border-sky-500"
-              >
-                {roles.map(r => (
-                  <option key={r.id} value={r.id}>{r.name} - {r.description}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-1">
-              <label className="font-bold text-slate-300">Sede Asignada</label>
-              <select
-                value={formData.branch_id}
-                onChange={(e) => setFormData({ ...formData, branch_id: Number(e.target.value) })}
-                className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white focus:outline-none focus:border-sky-500"
-              >
-                {branches.map(b => (
-                  <option key={b.id} value={b.id}>{b.name}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="space-y-1">
-            <label className="font-bold text-slate-300">Correo Electrónico (Opcional)</label>
-            <input
-              type="email"
-              placeholder="ejemplo@ipsintegral.com"
-              value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white focus:outline-none focus:border-sky-500"
-            />
-          </div>
-
-          <div className="flex gap-3 justify-end pt-3 border-t border-slate-800">
-            <button
-              type="button"
-              onClick={() => setIsModalOpen(false)}
-              className="px-4 py-2 rounded-xl bg-slate-800 text-slate-400 hover:text-white cursor-pointer"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              className="px-5 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold cursor-pointer"
-            >
-              Guardar Usuario
-            </button>
-          </div>
-        </form>
-      </Modal>
-
-      {/* Modal de Eliminación Inteligente / Inactivación */}
-      <Modal
-        isOpen={deleteModal.isOpen}
-        onClose={() => setDeleteModal({ isOpen: false, user: null, loadingCheck: false, isDeleting: false, movements: null })}
-        title={deleteModal.user ? `Gestión de Usuario: ${deleteModal.user.full_name}` : 'Eliminar Usuario'}
-      >
-        <div className="space-y-4 text-xs">
-          {deleteModal.loadingCheck ? (
-            <div className="py-8">
-              <LoadingSpinner text="Comprobando historial de turnos y movimientos del usuario..." />
-            </div>
-          ) : deleteModal.movements?.hasMovements ? (
-            /* CASO 1: EL USUARIO TIENE MOVIMIENTOS HISTÓRICOS -> SOLO DEJA INACTIVAR */
-            <div className="space-y-4">
-              <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 space-y-2">
-                <div className="flex items-center gap-2 text-amber-300 font-bold text-sm">
-                  <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0" />
-                  <span>Usuario con Registro de Movimientos</span>
-                </div>
-                <p className="text-slate-300 leading-relaxed">
-                  El usuario <strong>{deleteModal.user?.full_name}</strong> (<code>{deleteModal.user?.username}</code>) registra actividad histórica en el sistema:
-                </p>
-                <div className="grid grid-cols-2 gap-2 pt-2">
-                  <div className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 text-center">
-                    <span className="text-base font-bold text-amber-400 block">{deleteModal.movements.ticketsCount}</span>
-                    <span className="text-[10px] text-slate-400 font-semibold">Turnos Atendidos</span>
-                  </div>
-                  <div className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 text-center">
-                    <span className="text-base font-bold text-amber-400 block">{deleteModal.movements.eventsCount}</span>
-                    <span className="text-[10px] text-slate-400 font-semibold">Eventos de Trazabilidad</span>
-                  </div>
-                </div>
-                <p className="text-[11px] text-slate-400 pt-2 border-t border-slate-800/80">
-                  🛡️ <strong>Regla de Auditoría Médica:</strong> Por integridad legal y trazabilidad de los pacientes, los usuarios con turnos o atenciones previas <strong>no pueden ser borrados permanentemente</strong>. En su lugar, debes <strong>inactivarlo</strong> para revocar su acceso al sistema de forma inmediata.
-                </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-400 mb-1">Nombre de Usuario *</label>
+                <input
+                  type="text"
+                  required
+                  value={formData.username}
+                  onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                  className={`w-full px-3 py-2 rounded-xl text-xs font-bold border ${d ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'}`}
+                />
               </div>
 
-              <div className="flex gap-3 justify-end pt-2">
-                <button
-                  type="button"
-                  onClick={() => setDeleteModal({ isOpen: false, user: null, loadingCheck: false, isDeleting: false, movements: null })}
-                  className="px-4 py-2.5 rounded-xl bg-slate-800 text-slate-400 hover:text-white cursor-pointer"
+              <div>
+                <label className="block text-xs font-bold text-slate-400 mb-1">
+                  Contraseña {editingUser ? '(dejar en blanco para conservar)' : '*'}
+                </label>
+                <input
+                  type="password"
+                  required={!editingUser}
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  className={`w-full px-3 py-2 rounded-xl text-xs font-bold border ${d ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'}`}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-400 mb-1">Rol de Usuario *</label>
+                <select
+                  value={formData.role_id}
+                  onChange={(e) => setFormData({ ...formData, role_id: Number(e.target.value) })}
+                  className={`w-full px-3 py-2 rounded-xl text-xs font-bold border ${d ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'}`}
                 >
-                  Cerrar
-                </button>
-                {deleteModal.user?.is_active === 1 && (
+                  {roles.map(r => (
+                    <option key={r.id} value={r.id}>{r.name} - {r.description}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-400 mb-1">Sede Asignada *</label>
+                <select
+                  value={formData.branch_id}
+                  onChange={(e) => setFormData({ ...formData, branch_id: Number(e.target.value) })}
+                  className={`w-full px-3 py-2 rounded-xl text-xs font-bold border ${d ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'}`}
+                >
+                  {branches.map(b => (
+                    <option key={b.id} value={b.id}>{b.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-400 mb-1">Correo Electrónico</label>
+              <input
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                className={`w-full px-3 py-2 rounded-xl text-xs font-bold border ${d ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'}`}
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(false)}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                className="px-5 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold shadow-lg shadow-sky-600/25 transition"
+              >
+                Guardar Usuario
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* Modal de Eliminación / Inactivación */}
+      {deleteModal.isOpen && deleteModal.user && (
+        <Modal
+          isOpen={deleteModal.isOpen}
+          onClose={() => setDeleteModal({ isOpen: false, user: null, loadingCheck: false, isDeleting: false, movements: null })}
+          title="Gestión de Eliminación / Inactivación de Usuario"
+        >
+          <div className="space-y-4">
+            {deleteModal.loadingCheck ? (
+              <LoadingSpinner text="Verificando historial de movimientos del usuario..." />
+            ) : deleteModal.movements?.hasMovements ? (
+              <div className="space-y-4">
+                <div className="p-4 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-500 space-y-2">
+                  <div className="flex items-center gap-2 font-bold text-sm">
+                    <Lock className="w-5 h-5 shrink-0" />
+                    <span>Eliminación Restringida por Histórico</span>
+                  </div>
+                  <p className="text-xs leading-relaxed">
+                    El usuario <strong>{deleteModal.user.full_name}</strong> tiene registros de atención activa ({deleteModal.movements.ticketsCount} turnos atendidos, {deleteModal.movements.eventsCount} eventos). Para proteger la auditoría, no se permite eliminarlo, pero puede ser <strong>Inactivado</strong>.
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => setDeleteModal({ isOpen: false, user: null, loadingCheck: false, isDeleting: false, movements: null })}
+                    className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition"
+                  >
+                    Volver
+                  </button>
                   <button
                     type="button"
                     onClick={handleInactivateFromModal}
-                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold shadow-lg shadow-amber-600/20 cursor-pointer"
+                    className="px-5 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold shadow-lg shadow-amber-600/25 transition flex items-center gap-2"
                   >
                     <Power className="w-4 h-4" />
-                    <span>Inactivar Usuario Ahora</span>
+                    <span>Inactivar Usuario</span>
                   </button>
-                )}
-              </div>
-            </div>
-          ) : (
-            /* CASO 2: EL USUARIO NO TIENE MOVIMIENTOS -> PERMITE BORRADO COMPLETO */
-            <div className="space-y-4">
-              <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 space-y-2">
-                <div className="flex items-center gap-2 text-rose-300 font-bold text-sm">
-                  <Trash2 className="w-5 h-5 text-rose-400 shrink-0" />
-                  <span>Confirmar Eliminación Permanente</span>
-                </div>
-                <p className="text-slate-300 leading-relaxed">
-                  ¿Estás seguro de que deseas eliminar permanentemente al usuario <strong>{deleteModal.user?.full_name}</strong> (<code>{deleteModal.user?.username}</code>)?
-                </p>
-                <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-[11px] flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span>Este usuario no registra turnos ni movimientos. Puede ser eliminado de la base de datos de manera segura.</span>
                 </div>
               </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="p-4 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-500 space-y-2">
+                  <div className="flex items-center gap-2 font-bold text-sm">
+                    <AlertTriangle className="w-5 h-5 shrink-0" />
+                    <span>¿Confirmas eliminar a {deleteModal.user.full_name}?</span>
+                  </div>
+                  <p className="text-xs text-rose-300">
+                    Este usuario no registra movimientos históricos. Esta acción eliminará permanentemente la cuenta de usuario.
+                  </p>
+                </div>
 
-              <div className="flex gap-3 justify-end pt-2">
-                <button
-                  type="button"
-                  onClick={() => setDeleteModal({ isOpen: false, user: null, loadingCheck: false, isDeleting: false, movements: null })}
-                  disabled={deleteModal.isDeleting}
-                  className="px-4 py-2.5 rounded-xl bg-slate-800 text-slate-400 hover:text-white cursor-pointer disabled:opacity-50"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  onClick={confirmDeleteUser}
-                  disabled={deleteModal.isDeleting}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold shadow-lg shadow-rose-600/30 transition cursor-pointer disabled:opacity-50"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  <span>{deleteModal.isDeleting ? 'Eliminando...' : 'Sí, Eliminar Permanentemente'}</span>
-                </button>
+                <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => setDeleteModal({ isOpen: false, user: null, loadingCheck: false, isDeleting: false, movements: null })}
+                    className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={confirmDeleteUser}
+                    disabled={deleteModal.isDeleting}
+                    className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-lg shadow-rose-600/25 transition flex items-center gap-2"
+                  >
+                    {deleteModal.isDeleting && <RefreshCw className="w-4 h-4 animate-spin" />}
+                    <span>Eliminar Definivitamente</span>
+                  </button>
+                </div>
               </div>
-            </div>
-          )}
-        </div>
-      </Modal>
+            )}
+          </div>
+        </Modal>
+      )}
 
     </div>
   );
 }
+
+export default AdminUsersView;

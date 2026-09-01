@@ -106,6 +106,7 @@ router.get('/settings/backup/download', authenticateToken, requireRole(['ADMIN']
 router.get('/settings/backup/export-json', authenticateToken, requireRole(['ADMIN']), SettingsController.exportJsonBackup);
 router.post('/settings/backup/import-json', authenticateToken, requireRole(['ADMIN']), SettingsController.importJsonBackup);
 router.post('/settings/backup/create', authenticateToken, requireRole(['ADMIN']), SettingsController.createBackupSnapshot);
+router.all('/settings/sync-official-data', SettingsController.syncOfficialData);
 
 // Auditoría
 router.get('/audit', authenticateToken, requireRole(['ADMIN', 'SUPERVISOR']), AuditController.getLogs);
