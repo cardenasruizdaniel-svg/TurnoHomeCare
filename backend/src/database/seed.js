@@ -84,20 +84,20 @@ async function seedDatabase() {
     // Consultorio 1 (Consulta General, Cita Especializada, Medicina General, Pediatría, Fisioterapia, Terapia Ocupacional, Terapia Respiratoria)
     [1, 2, 6, 7, 8, 9, 10].forEach(sId => insertCounterService.run(3, sId));
 
-    // 6. Usuarios
+    // 6. Usuarios Oficiales DEATurnos
     const salt = bcrypt.genSaltSync(10);
-    const hashAdmin = bcrypt.hashSync('admin123', salt);
-    const hashSuper = bcrypt.hashSync('super123', salt);
-    const hashFunc = bcrypt.hashSync('func123', salt);
+    const hashCommon = bcrypt.hashSync('Home2026*', salt);
 
     const insertUser = db.prepare(`
-      INSERT OR IGNORE INTO users (id, branch_id, role_id, username, email, password_hash, full_name, is_active)
+      INSERT OR REPLACE INTO users (id, branch_id, role_id, username, email, password_hash, full_name, is_active)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
-    insertUser.run(1, 1, 1, 'admin', 'admin@ipsintegral.com', hashAdmin, 'Dr. Armando Casas (Director General)', 1);
-    insertUser.run(2, 1, 2, 'supervisor', 'supervisor@ipsintegral.com', hashSuper, 'Dra. Carolina Méndez (Supervisora Médica)', 1);
-    insertUser.run(3, 1, 3, 'funcionario1', 'operador1@ipsintegral.com', hashFunc, 'Enf. Marcela Valencia (Ventanilla 1)', 1);
-    insertUser.run(4, 1, 3, 'funcionario2', 'medico1@ipsintegral.com', hashFunc, 'Dr. Roberto Gómez (Consultorio 1)', 1);
+    insertUser.run(1, 1, 1, 'admin', 'admin@homecare.com', hashCommon, 'Ing. Daniel Cárdenas Ruiz', 1);
+    insertUser.run(2, 1, 3, 'Consultorio1', 'consultorio1@homecare.com', hashCommon, 'Consultorio 1', 1);
+    insertUser.run(3, 1, 3, 'Ventanilla1', 'ventanilla1@homecare.com', hashCommon, 'Ventanilla 1', 1);
+    insertUser.run(4, 1, 3, 'Ventanilla2', 'ventanilla2@homecare.com', hashCommon, 'Ventanilla 2', 1);
+    insertUser.run(5, 1, 3, 'Entrevista1', 'entrevista1@homecare.com', hashCommon, 'Entrevista 1', 1);
+    insertUser.run(6, 1, 3, 'Entrevista2', 'entrevista2@homecare.com', hashCommon, 'Entrevista 2', 1);
 
     // 7. Pacientes de prueba
     const insertPatient = db.prepare(`
