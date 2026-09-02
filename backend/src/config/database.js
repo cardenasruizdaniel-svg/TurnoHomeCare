@@ -208,7 +208,7 @@ const dbWrapper = {
           let pgSql = normalizeSqlForPostgres(sql);
 
           // Si es INSERT y no incluye RETURNING, agregar RETURNING id para obtener lastInsertRowid
-          if (/^\s*INSERT\s+INTO/i.test(pgSql) && !/RETURNING/i.test(pgSql)) {
+          if (/^\s*INSERT\s+INTO/i.test(pgSql) && !/RETURNING/i.test(pgSql) && !/counter_services/i.test(pgSql)) {
             pgSql += ' RETURNING id';
           }
 

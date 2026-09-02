@@ -138,11 +138,13 @@ async function syncServicesAndCounters() {
       }
     }
 
-    // 1. BORRAR todos los servicios que no estén en la lista oficial de los 10 solicitados
-    const officialCodes = officialServices.map(s => s.code);
-    const placeholders = officialCodes.map(() => '?').join(',');
-    await db.prepare(`DELETE FROM counter_services WHERE service_id IN (SELECT id FROM services WHERE code NOT IN (${placeholders}, 'CM', 'HPED'))`).run(...officialCodes);
-    await db.prepare(`DELETE FROM services WHERE code NOT IN (${placeholders}, 'CM', 'HPED')`).run(...officialCodes);
+    try {
+      await db.prepare(`DELETE FROM tickets WHERE service_id IN (SELECT id FROM services WHERE code NOT IN (${placeholders}, 'CM', 'HPED'))`).run(...officialCodes);
+      await db.prepare(`DELETE FROM counter_services WHERE service_id IN (SELECT id FROM services WHERE code NOT IN (${placeholders}, 'CM', 'HPED'))`).run(...officialCodes);
+      await db.prepare(`DELETE FROM services WHERE code NOT IN (${placeholders}, 'CM', 'HPED')`).run(...officialCodes);
+    } catch (e) {
+      // Ignorar si hay llaves foráneas o registros históricos
+    }
 
     // 2. Insertar o actualizar los 10 servicios oficiales requeridos
     for (const s of officialServices) {

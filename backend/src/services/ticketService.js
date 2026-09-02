@@ -125,7 +125,7 @@ class TicketService {
         ) VALUES (?, ?, ?, ?, ?, ?, 'ESPERANDO', ?, ?, ?)
       `);
 
-      const result = insertStmt.run(
+      const result = await insertStmt.run(
         ticketNumber,
         branchId,
         service.id,
