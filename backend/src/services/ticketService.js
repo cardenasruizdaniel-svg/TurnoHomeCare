@@ -7,16 +7,16 @@ class TicketService {
   /**
    * Busca o crea un paciente por número de documento y clasifica su prioridad por edad
    */
-  static getOrCreatePatient({ documentNumber, fullName, age, phone }) {
-    const priorityMinAge = SettingsService.get('EDAD_PRIORIDAD') || 60;
+  static async getOrCreatePatient({ documentNumber, fullName, age, phone }) {
+    const priorityMinAge = await SettingsService.get('EDAD_PRIORIDAD') || 60;
     const isPriorityAuto = Number(age) >= priorityMinAge ? 1 : 0;
 
-    let patient = db.prepare('SELECT * FROM patients WHERE document_number = ?').get(documentNumber);
+    let patient = await db.prepare('SELECT * FROM patients WHERE document_number = ?').get(documentNumber);
 
     if (patient) {
       // Si se proporcionaron nuevos datos, actualizamos
       if (fullName || age || phone) {
-        db.prepare(`
+        await db.prepare(`
           UPDATE patients 
           SET full_name = COALESCE(?, full_name),
               age = COALESCE(?, age),
@@ -25,17 +25,17 @@ class TicketService {
               updated_at = CURRENT_TIMESTAMP
           WHERE id = ?
         `).run(fullName, age, phone, isPriorityAuto, patient.id);
-        patient = db.prepare('SELECT * FROM patients WHERE id = ?').get(patient.id);
+        patient = await db.prepare('SELECT * FROM patients WHERE id = ?').get(patient.id);
       }
     } else {
       if (!fullName || age === undefined || !phone) {
         throw new Error('DATOS_INCOMPLETOS_REGISTRO');
       }
-      const result = db.prepare(`
+      const result = await db.prepare(`
         INSERT INTO patients (document_number, full_name, age, phone, is_priority_auto)
         VALUES (?, ?, ?, ?, ?)
       `).run(documentNumber, fullName, Number(age), phone, isPriorityAuto);
-      patient = db.prepare('SELECT * FROM patients WHERE id = ?').get(result.lastInsertRowid);
+      patient = await db.prepare('SELECT * FROM patients WHERE id = ?').get(result.lastInsertRowid);
     }
 
     return patient;
@@ -44,23 +44,23 @@ class TicketService {
   /**
    * Crea un nuevo turno validando duplicados, horarios y reglas de prioridad
    */
-  static createTicket({ branchId = 1, serviceId, patientData, ipAddress = null, appointmentTime = null, targetCounterId = null }) {
-    const branch = db.prepare('SELECT * FROM branches WHERE id = ? AND is_active = 1').get(branchId);
+  static async createTicket({ branchId = 1, serviceId, patientData, ipAddress = null, appointmentTime = null, targetCounterId = null }) {
+    const branch = await db.prepare('SELECT * FROM branches WHERE id = ? AND is_active = 1').get(branchId);
     if (!branch) {
       throw new Error('SEDE_NO_ENCONTRADA_O_INACTIVA');
     }
 
-    const service = db.prepare('SELECT * FROM services WHERE id = ? AND is_active = 1').get(serviceId);
+    const service = await db.prepare('SELECT * FROM services WHERE id = ? AND is_active = 1').get(serviceId);
     if (!service) {
       throw new Error('SERVICIO_NO_ENCONTRADO_O_INACTIVO');
     }
 
     // 1. Obtener o crear paciente
-    const patient = this.getOrCreatePatient(patientData);
+    const patient = await this.getOrCreatePatient(patientData);
     // 2. Control anti-duplicados por servicio si está habilitado
-    const preventDuplicates = SettingsService.get('PREVENIR_DUPLICADOS', branchId);
+    const preventDuplicates = await SettingsService.get('PREVENIR_DUPLICADOS', branchId);
     if (preventDuplicates) {
-      const activeTicket = db.prepare(`
+      const activeTicket = await db.prepare(`
         SELECT t.*, s.name as service_name, b.name as branch_name
         FROM tickets t
         JOIN services s ON t.service_id = s.id
@@ -82,13 +82,13 @@ class TicketService {
     }
 
     // 3. Determinar tipo de turno y prefijo
-    const priorityMinAge = SettingsService.get('EDAD_PRIORIDAD', branchId) || 60;
+    const priorityMinAge = await SettingsService.get('EDAD_PRIORIDAD', branchId) || 60;
     const isPriority = patient.age >= priorityMinAge || patient.is_priority_auto === 1;
     const ticketType = isPriority ? 'PRIORITARIO' : 'NORMAL';
 
-    const defaultNormalPrefix = SettingsService.get('PREFIJO_NORMAL', branchId) || 'A';
-    const defaultPriorityPrefix = SettingsService.get('PREFIJO_PRIORITARIO', branchId) || 'P';
-    const numDigits = SettingsService.get('DIGITOS_NUMERACION', branchId) || 3;
+    const defaultNormalPrefix = await SettingsService.get('PREFIJO_NORMAL', branchId) || 'A';
+    const defaultPriorityPrefix = await SettingsService.get('PREFIJO_PRIORITARIO', branchId) || 'P';
+    const numDigits = await SettingsService.get('DIGITOS_NUMERACION', branchId) || 3;
 
     // Usar prefijo del servicio si tiene letra asignada, o prefijo prioritario
     const prefix = isPriority 
@@ -104,13 +104,13 @@ class TicketService {
     
     let createdTicket = null;
 
-    const transaction = db.transaction(() => {
+    const transaction = db.transaction(async () => {
       // Obtener el número secuencial más alto del día para esta sede y servicio
-      const lastSequence = db.prepare(`
+      const lastSequence = await db.prepare(`
         SELECT MAX(sequence_number) as max_seq
         FROM tickets
         WHERE branch_id = ? 
-          AND (created_date = ? OR date(created_at, 'localtime') = ?)
+          AND (created_date = ? OR DATE(created_at) = ?)
           AND service_id = ?
       `).get(branchId, today, today, service.id);
 
@@ -118,7 +118,7 @@ class TicketService {
       const formattedSeq = String(nextSequence).padStart(numDigits, '0');
       const ticketNumber = `${prefix}-${formattedSeq}`;
 
-      const insertStmt = db.prepare(`
+      const insertStmt = await db.prepare(`
         INSERT INTO tickets (
           ticket_number, branch_id, service_id, patient_id, counter_id,
           ticket_type, status, sequence_number, created_date, appointment_time
@@ -140,12 +140,12 @@ class TicketService {
       const ticketId = result.lastInsertRowid;
 
       // Registrar evento
-      db.prepare(`
+      await db.prepare(`
         INSERT INTO ticket_events (ticket_id, from_status, to_status, counter_id, metadata)
         VALUES (?, NULL, 'ESPERANDO', ?, ?)
       `).run(ticketId, targetCounterId ? Number(targetCounterId) : null, JSON.stringify({ ip: ipAddress, age: patient.age, isPriority, appointmentTime }));
 
-      createdTicket = db.prepare(`
+      createdTicket = await db.prepare(`
         SELECT t.*, s.name as service_name, s.code as service_code, 
                p.full_name as patient_name, p.document_number, p.age as patient_age,
                b.name as branch_name,
@@ -159,12 +159,12 @@ class TicketService {
       `).get(ticketId);
     });
 
-    transaction();
+    await transaction();
 
     // 5. Calcular cuántos turnos hay antes
     const queuePosition = this.getQueuePosition(createdTicket.id, branchId, service.id);
 
-    AuditService.log({
+    await AuditService.log({
       action: 'CREATE_TICKET',
       entity: 'TICKET',
       entityId: createdTicket.id,
@@ -183,13 +183,13 @@ class TicketService {
   /**
    * Obtiene la posición en la cola y tiempo estimado
    */
-  static getQueuePosition(ticketId, branchId, serviceId) {
-    const targetTicket = db.prepare('SELECT id, created_at, status FROM tickets WHERE id = ?').get(ticketId);
+  static async getQueuePosition(ticketId, branchId, serviceId) {
+    const targetTicket = await db.prepare('SELECT id, created_at, status FROM tickets WHERE id = ?').get(ticketId);
     if (!targetTicket || targetTicket.status !== 'ESPERANDO') {
       return { ahead_count: 0, estimated_wait_minutes: 0 };
     }
 
-    const countBefore = db.prepare(`
+    const countBefore = await db.prepare(`
       SELECT COUNT(*) as count 
       FROM tickets 
       WHERE branch_id = ? 
@@ -202,7 +202,7 @@ class TicketService {
         AND id != ?
     `).get(branchId, serviceId, ticketId, targetTicket.created_at, ticketId);
 
-    const service = db.prepare('SELECT estimated_minutes FROM services WHERE id = ?').get(serviceId);
+    const service = await db.prepare('SELECT estimated_minutes FROM services WHERE id = ?').get(serviceId);
     const estPerTicket = service ? service.estimated_minutes : 15;
 
     return {
@@ -214,9 +214,9 @@ class TicketService {
   /**
    * Algoritmo inteligente de prioridad (2 normales x 1 prioritario configurable con fallback anti-bloqueo)
    */
-  static getNextRecommendedTicket(counterId, branchId) {
+  static async getNextRecommendedTicket(counterId, branchId) {
     // 1. Primero: Buscar si hay algún turno derivado o asignado ESPECÍFICAMENTE a este módulo/consultorio
-    const directAssigned = db.prepare(`
+    const directAssigned = await db.prepare(`
       SELECT t.*, s.name as service_name, p.full_name as patient_name, p.age as patient_age
       FROM tickets t
       JOIN services s ON t.service_id = s.id
@@ -232,7 +232,7 @@ class TicketService {
     }
 
     // 2. Obtener servicios asignados a este módulo
-    const assignedServices = db.prepare(`
+    const assignedServices = await db.prepare(`
       SELECT service_id FROM counter_services WHERE counter_id = ?
     `).all(counterId).map(s => s.service_id);
 
@@ -243,7 +243,7 @@ class TicketService {
     const placeholders = assignedServices.map(() => '?').join(',');
 
     // 3. Obtener turnos generales en espera para los servicios de este módulo
-    const waitingTickets = db.prepare(`
+    const waitingTickets = await db.prepare(`
       SELECT t.*, s.name as service_name, p.full_name as patient_name, p.age as patient_age
       FROM tickets t
       JOIN services s ON t.service_id = s.id
@@ -267,11 +267,11 @@ class TicketService {
     if (normalTickets.length === 0) return priorityTickets[0];
 
     // 4. Evaluar la proporción de atención histórica del día (Ratio de Prioridad)
-    const ratioPriority = SettingsService.get('RATIO_PRIORIDAD', branchId) || 2;
+    const ratioPriority = await SettingsService.get('RATIO_PRIORIDAD', branchId) || 2;
     const _now = new Date(); const today = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, '0')}-${String(_now.getDate()).padStart(2, '0')}`;
 
     // Obtener los últimos turnos llamados ordenados por el historial exacto de eventos
-    const recentCalled = db.prepare(`
+    const recentCalled = await db.prepare(`
       SELECT t.ticket_type, te.id as event_id
       FROM ticket_events te
       JOIN tickets t ON te.ticket_id = t.id
@@ -308,13 +308,13 @@ class TicketService {
   /**
    * Llamar siguiente turno con bloqueo de concurrencia atómica
    */
-  static callNextTicket({ counterId, userId, branchId, specificTicketId = null }) {
-    this.activateScheduledTicketsForToday();
+  static async callNextTicket({ counterId, userId, branchId, specificTicketId = null }) {
+    await this.activateScheduledTicketsForToday();
     let calledTicket = null;
 
-    const transaction = db.transaction(() => {
+    const transaction = db.transaction(async () => {
       // 1. Verificar si el módulo o funcionario tiene un turno en 'LLAMADO' o 'EN_ATENCION' sin finalizar
-      const currentActive = db.prepare(`
+      const currentActive = await db.prepare(`
         SELECT * FROM tickets 
         WHERE counter_id = ? AND status IN ('LLAMADO', 'EN_ATENCION')
         LIMIT 1
@@ -323,7 +323,7 @@ class TicketService {
       if (currentActive) {
         // Marcamos automáticamente el anterior como finalizado o solicitamos finalizar
         // Para fluidez de trabajo, si estaba en 'LLAMADO' y nunca inició atención, pasa a NO_PRESENTO o FINALIZADO
-        db.prepare(`
+        await db.prepare(`
           UPDATE tickets 
           SET status = 'FINALIZADO', completed_at = CURRENT_TIMESTAMP,
               attention_time_seconds = CASE 
@@ -332,7 +332,7 @@ class TicketService {
           WHERE id = ?
         `).run(currentActive.id);
 
-        db.prepare(`
+        await db.prepare(`
           INSERT INTO ticket_events (ticket_id, from_status, to_status, user_id, counter_id, metadata)
           VALUES (?, ?, 'FINALIZADO', ?, ?, 'Auto-finalizado al llamar siguiente')
         `).run(currentActive.id, currentActive.status, userId, counterId);
@@ -341,11 +341,11 @@ class TicketService {
       // 2. Seleccionar el turno a llamar
       let targetTicket = null;
       if (specificTicketId) {
-        targetTicket = db.prepare(`
+        targetTicket = await db.prepare(`
           SELECT * FROM tickets WHERE id = ? AND status = 'ESPERANDO'
         `).get(specificTicketId);
       } else {
-        targetTicket = this.getNextRecommendedTicket(counterId, branchId);
+        targetTicket = await this.getNextRecommendedTicket(counterId, branchId);
         // Si no hay turnos para los servicios asignados a este consultorio/módulo, no roba turnos de otros módulos
       }
 
@@ -354,7 +354,7 @@ class TicketService {
       }
 
       // 3. Actualizar estado a 'LLAMADO' de forma atómica
-      const updateResult = db.prepare(`
+      const updateResult = await db.prepare(`
         UPDATE tickets
         SET status = 'LLAMADO',
             counter_id = ?,
@@ -371,12 +371,12 @@ class TicketService {
       }
 
       // 4. Registrar evento
-      db.prepare(`
+      await db.prepare(`
         INSERT INTO ticket_events (ticket_id, from_status, to_status, user_id, counter_id)
         VALUES (?, 'ESPERANDO', 'LLAMADO', ?, ?)
       `).run(targetTicket.id, userId, counterId);
 
-      calledTicket = db.prepare(`
+      calledTicket = await db.prepare(`
         SELECT t.*, s.name as service_name, s.code as service_code,
                c.name as counter_name, c.code as counter_code,
                u.full_name as user_name,
@@ -390,10 +390,10 @@ class TicketService {
       `).get(targetTicket.id);
     });
 
-    transaction();
+    await transaction();
 
     if (calledTicket) {
-      AuditService.log({
+      await AuditService.log({
         userId,
         action: 'CALL_TICKET',
         entity: 'TICKET',
@@ -408,8 +408,8 @@ class TicketService {
   /**
    * Re-llamar un turno activo
    */
-  static recallTicket(ticketId, userId) {
-    const ticket = db.prepare(`
+  static async recallTicket(ticketId, userId) {
+    const ticket = await db.prepare(`
       SELECT t.*, s.name as service_name, c.name as counter_name, c.code as counter_code,
              p.full_name as patient_name
       FROM tickets t
@@ -421,19 +421,19 @@ class TicketService {
 
     if (!ticket) throw new Error('TURNO_NO_ENCONTRADO');
 
-    db.prepare(`
+    await db.prepare(`
       UPDATE tickets 
       SET call_count = call_count + 1,
           called_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `).run(ticketId);
 
-    db.prepare(`
+    await db.prepare(`
       INSERT INTO ticket_events (ticket_id, from_status, to_status, user_id, counter_id, metadata)
       VALUES (?, ?, 'LLAMADO', ?, ?, 'Re-llamado de turno')
     `).run(ticketId, ticket.status, userId, ticket.counter_id);
 
-    AuditService.log({
+    await AuditService.log({
       userId,
       action: 'RECALL_TICKET',
       entity: 'TICKET',
@@ -441,29 +441,29 @@ class TicketService {
       details: { ticket_number: ticket.ticket_number, call_count: ticket.call_count + 1 }
     });
 
-    return db.prepare('SELECT * FROM tickets WHERE id = ?').get(ticketId);
+    return await db.prepare('SELECT * FROM tickets WHERE id = ?').get(ticketId);
   }
 
   /**
    * Iniciar atención del turno
    */
-  static startAttention(ticketId, userId) {
-    const ticket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(ticketId);
+  static async startAttention(ticketId, userId) {
+    const ticket = await db.prepare('SELECT * FROM tickets WHERE id = ?').get(ticketId);
     if (!ticket) throw new Error('TURNO_NO_ENCONTRADO');
 
-    db.prepare(`
+    await db.prepare(`
       UPDATE tickets
       SET status = 'EN_ATENCION',
           attended_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `).run(ticketId);
 
-    db.prepare(`
+    await db.prepare(`
       INSERT INTO ticket_events (ticket_id, from_status, to_status, user_id, counter_id)
       VALUES (?, ?, 'EN_ATENCION', ?, ?)
     `).run(ticketId, ticket.status, userId, ticket.counter_id);
 
-    AuditService.log({
+    await AuditService.log({
       userId,
       action: 'START_ATTENTION',
       entity: 'TICKET',
@@ -471,17 +471,17 @@ class TicketService {
       details: { ticket_number: ticket.ticket_number }
     });
 
-    return db.prepare('SELECT * FROM tickets WHERE id = ?').get(ticketId);
+    return await db.prepare('SELECT * FROM tickets WHERE id = ?').get(ticketId);
   }
 
   /**
    * Finalizar atención del turno
    */
-  static completeTicket(ticketId, userId, notes = null) {
-    const ticket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(ticketId);
+  static async completeTicket(ticketId, userId, notes = null) {
+    const ticket = await db.prepare('SELECT * FROM tickets WHERE id = ?').get(ticketId);
     if (!ticket) throw new Error('TURNO_NO_ENCONTRADO');
 
-    db.prepare(`
+    await db.prepare(`
       UPDATE tickets
       SET status = 'FINALIZADO',
           completed_at = CURRENT_TIMESTAMP,
@@ -493,12 +493,12 @@ class TicketService {
       WHERE id = ?
     `).run(notes, ticketId);
 
-    db.prepare(`
+    await db.prepare(`
       INSERT INTO ticket_events (ticket_id, from_status, to_status, user_id, counter_id, metadata)
       VALUES (?, ?, 'FINALIZADO', ?, ?, ?)
     `).run(ticketId, ticket.status, userId, ticket.counter_id, notes ? JSON.stringify({ notes }) : null);
 
-    AuditService.log({
+    await AuditService.log({
       userId,
       action: 'COMPLETE_TICKET',
       entity: 'TICKET',
@@ -506,29 +506,29 @@ class TicketService {
       details: { ticket_number: ticket.ticket_number }
     });
 
-    return db.prepare('SELECT * FROM tickets WHERE id = ?').get(ticketId);
+    return await db.prepare('SELECT * FROM tickets WHERE id = ?').get(ticketId);
   }
 
   /**
    * Marcar como No Se Presentó
    */
-  static markNoShow(ticketId, userId) {
-    const ticket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(ticketId);
+  static async markNoShow(ticketId, userId) {
+    const ticket = await db.prepare('SELECT * FROM tickets WHERE id = ?').get(ticketId);
     if (!ticket) throw new Error('TURNO_NO_ENCONTRADO');
 
-    db.prepare(`
+    await db.prepare(`
       UPDATE tickets
       SET status = 'NO_PRESENTO',
           completed_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `).run(ticketId);
 
-    db.prepare(`
+    await db.prepare(`
       INSERT INTO ticket_events (ticket_id, from_status, to_status, user_id, counter_id)
       VALUES (?, ?, 'NO_PRESENTO', ?, ?)
     `).run(ticketId, ticket.status, userId, ticket.counter_id);
 
-    AuditService.log({
+    await AuditService.log({
       userId,
       action: 'NO_SHOW_TICKET',
       entity: 'TICKET',
@@ -536,35 +536,35 @@ class TicketService {
       details: { ticket_number: ticket.ticket_number }
     });
 
-    return db.prepare('SELECT * FROM tickets WHERE id = ?').get(ticketId);
+    return await db.prepare('SELECT * FROM tickets WHERE id = ?').get(ticketId);
   }
 
   /**
    * Pausar o transferir turno
    */
-  static pauseTicket(ticketId, userId) {
-    const ticket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(ticketId);
+  static async pauseTicket(ticketId, userId) {
+    const ticket = await db.prepare('SELECT * FROM tickets WHERE id = ?').get(ticketId);
     if (!ticket) throw new Error('TURNO_NO_ENCONTRADO');
 
-    db.prepare(`
+    await db.prepare(`
       UPDATE tickets
       SET status = 'PAUSADO'
       WHERE id = ?
     `).run(ticketId);
 
-    db.prepare(`
+    await db.prepare(`
       INSERT INTO ticket_events (ticket_id, from_status, to_status, user_id, counter_id)
       VALUES (?, ?, 'PAUSADO', ?, ?)
     `).run(ticketId, ticket.status, userId, ticket.counter_id);
 
-    return db.prepare('SELECT * FROM tickets WHERE id = ?').get(ticketId);
+    return await db.prepare('SELECT * FROM tickets WHERE id = ?').get(ticketId);
   }
 
   /**
    * Derivar / Transferir turno de un módulo a otro consultorio o servicio
    */
-  static transferTicket({ ticketId, targetServiceId, targetCounterId = null, notes = null, userId, fromCounterId = null }) {
-    const ticket = db.prepare(`
+  static async transferTicket({ ticketId, targetServiceId, targetCounterId = null, notes = null, userId, fromCounterId = null }) {
+    const ticket = await db.prepare(`
       SELECT t.*, s.name as current_service_name, p.full_name as patient_name
       FROM tickets t
       JOIN services s ON t.service_id = s.id
@@ -578,7 +578,7 @@ class TicketService {
     const finalCounterId = targetCounterId ? Number(targetCounterId) : null;
 
     if (!finalServiceId && finalCounterId) {
-      const primaryCounterService = db.prepare(`
+      const primaryCounterService = await db.prepare(`
         SELECT service_id FROM counter_services WHERE counter_id = ? LIMIT 1
       `).get(finalCounterId);
       if (primaryCounterService) {
@@ -591,21 +591,21 @@ class TicketService {
     }
 
     const fromCounter = fromCounterId 
-      ? db.prepare('SELECT * FROM counters WHERE id = ?').get(fromCounterId)
-      : (ticket.counter_id ? db.prepare('SELECT * FROM counters WHERE id = ?').get(ticket.counter_id) : null);
+      ? await db.prepare('SELECT * FROM counters WHERE id = ?').get(fromCounterId)
+      : (ticket.counter_id ? await db.prepare('SELECT * FROM counters WHERE id = ?').get(ticket.counter_id) : null);
 
     const toCounter = finalCounterId 
-      ? db.prepare('SELECT * FROM counters WHERE id = ?').get(finalCounterId)
+      ? await db.prepare('SELECT * FROM counters WHERE id = ?').get(finalCounterId)
       : null;
 
-    const targetService = db.prepare('SELECT * FROM services WHERE id = ?').get(finalServiceId);
+    const targetService = await db.prepare('SELECT * FROM services WHERE id = ?').get(finalServiceId);
 
     const transferNote = `[Derivado de ${fromCounter ? fromCounter.name : 'Ventanilla'} ➔ ${toCounter ? toCounter.name : (targetService ? targetService.name : 'Consultorio')}] ${notes || ''}`.trim();
 
     const updatedNotes = ticket.notes ? `${ticket.notes}\n${transferNote}` : transferNote;
 
     // Actualizar turno: pasa a 'ESPERANDO' y asignado al nuevo consultorio
-    db.prepare(`
+    await db.prepare(`
       UPDATE tickets
       SET status = 'ESPERANDO',
           service_id = ?,
@@ -617,7 +617,7 @@ class TicketService {
     `).run(finalServiceId, finalCounterId, updatedNotes, ticketId);
 
     // Registrar evento de derivación
-    db.prepare(`
+    await db.prepare(`
       INSERT INTO ticket_events (ticket_id, from_status, to_status, user_id, counter_id, metadata)
       VALUES (?, ?, 'ESPERANDO', ?, ?, ?)
     `).run(
@@ -634,7 +634,7 @@ class TicketService {
       })
     );
 
-    AuditService.log({
+    await AuditService.log({
       userId,
       action: 'TRANSFER_TICKET',
       entity: 'TICKET',
@@ -648,7 +648,7 @@ class TicketService {
       }
     });
 
-    return db.prepare(`
+    return await db.prepare(`
       SELECT t.*, s.name as service_name, s.code as service_code,
              p.full_name as patient_name, p.document_number, p.age as patient_age
       FROM tickets t
@@ -661,12 +661,12 @@ class TicketService {
   /**
    * Datos para la Pantalla Pública TV
    */
-  static getPublicDisplayData(branchId = 1) {
-    this.activateScheduledTicketsForToday();
-    const historyCount = SettingsService.get('HISTORIAL_PANTALLA_CANTIDAD', branchId) || 6;
+  static async getPublicDisplayData(branchId = 1) {
+    await this.activateScheduledTicketsForToday();
+    const historyCount = await SettingsService.get('HISTORIAL_PANTALLA_CANTIDAD', branchId) || 6;
 
     // Turno actualmente en llamado o atención más reciente
-    const currentTicket = db.prepare(`
+    const currentTicket = await db.prepare(`
       SELECT t.*, s.name as service_name, s.code as service_code,
              c.name as counter_name, c.code as counter_code,
              p.full_name as patient_name, p.document_number
@@ -680,7 +680,7 @@ class TicketService {
     `).get(branchId);
 
     // Historial de últimos turnos llamados
-    const recentTickets = db.prepare(`
+    const recentTickets = await db.prepare(`
       SELECT t.*, s.name as service_name, s.code as service_code,
              c.name as counter_name, c.code as counter_code,
              p.full_name as patient_name, p.document_number
@@ -694,9 +694,9 @@ class TicketService {
       ORDER BY t.called_at DESC LIMIT ?
     `).all(branchId, currentTicket ? currentTicket.id : null, currentTicket ? currentTicket.id : null, historyCount);
 
-    const branch = db.prepare('SELECT * FROM branches WHERE id = ?').get(branchId);
-    const company = branch ? db.prepare('SELECT * FROM companies WHERE id = ?').get(branch.company_id) : null;
-    const settings = SettingsService.getAll(branchId);
+    const branch = await db.prepare('SELECT * FROM branches WHERE id = ?').get(branchId);
+    const company = branch ? await db.prepare('SELECT * FROM companies WHERE id = ?').get(branch.company_id) : null;
+    const settings = await SettingsService.getAll(branchId);
 
     const effectiveBaseUrl = TunnelService.getEffectivePublicUrl(process.env.PORT || 5000);
     const publicRequestUrl = `${effectiveBaseUrl}/solicitar-turno?branchId=${branchId}`;
@@ -715,14 +715,14 @@ class TicketService {
   /**
    * Obtiene la cola de espera activa para la sede o módulo y la agenda del día
    */
-  static getWaitingQueue(branchId = 1, counterId = null) {
-    this.activateScheduledTicketsForToday();
+  static async getWaitingQueue(branchId = 1, counterId = null) {
+    await this.activateScheduledTicketsForToday();
     let counterFilter = '';
     const params = [branchId];
     let assignedServiceNames = [];
 
     if (counterId) {
-      const assigned = db.prepare(`
+      const assigned = await db.prepare(`
         SELECT cs.service_id, s.name, s.letter_prefix 
         FROM counter_services cs
         JOIN services s ON cs.service_id = s.id
@@ -742,7 +742,7 @@ class TicketService {
     }
 
     // Turnos asignados específicamente a este módulo en estado ESPERANDO
-    const waiting = db.prepare(`
+    const waiting = await db.prepare(`
       SELECT t.*, s.name as service_name, s.letter_prefix, s.code as service_code,
              p.full_name as patient_name, p.document_number, p.age as patient_age, p.phone as patient_phone,
              c.name as counter_name, c.code as counter_code
@@ -762,7 +762,7 @@ class TicketService {
     `).all(...params);
 
     // Todos los turnos en espera de la sede (para visibilidad global)
-    const allBranchWaiting = db.prepare(`
+    const allBranchWaiting = await db.prepare(`
       SELECT t.*, s.name as service_name, s.letter_prefix, s.code as service_code,
              p.full_name as patient_name, p.document_number, p.age as patient_age, p.phone as patient_phone,
              c.name as counter_name, c.code as counter_code
@@ -784,7 +784,7 @@ class TicketService {
     const today = `${year}-${month}-${day}`;
 
     if (counterId) {
-      agendaTickets = db.prepare(`
+      agendaTickets = await db.prepare(`
         SELECT t.*, s.name as service_name, s.letter_prefix, s.code as service_code,
                c.name as counter_name, c.code as counter_code,
                p.full_name as patient_name, p.document_number, p.age as patient_age, p.phone as patient_phone
@@ -793,7 +793,7 @@ class TicketService {
         JOIN patients p ON t.patient_id = p.id
         LEFT JOIN counters c ON t.counter_id = c.id
         WHERE t.branch_id = ?
-          AND (t.created_date = ? OR date(t.created_at, 'localtime') = ?)
+          AND (t.created_date = ? OR DATE(t.created_at) = ?)
           ${counterFilter}
         ORDER BY 
           CASE 
@@ -813,7 +813,7 @@ class TicketService {
     // Turno actualmente en atención o llamado en ESTE puesto/módulo
     let counterActiveTicket = null;
     if (counterId) {
-      counterActiveTicket = db.prepare(`
+      counterActiveTicket = await db.prepare(`
         SELECT t.*, s.name as service_name, s.code as service_code,
                c.name as counter_name, c.code as counter_code,
                p.full_name as patient_name, p.document_number, p.age as patient_age, p.phone as patient_phone
@@ -827,7 +827,7 @@ class TicketService {
     }
 
     // Conteo desglosado por servicio
-    const serviceCounts = db.prepare(`
+    const serviceCounts = await db.prepare(`
       SELECT s.id, s.name, s.code, s.letter_prefix, COUNT(t.id) as count
       FROM services s
       LEFT JOIN tickets t ON t.service_id = s.id AND t.status = 'ESPERANDO' AND t.branch_id = ?
@@ -835,7 +835,7 @@ class TicketService {
       GROUP BY s.id
     `).all(branchId);
 
-    const recommended = counterId ? this.getNextRecommendedTicket(counterId, branchId) : null;
+    const recommended = counterId ? await this.getNextRecommendedTicket(counterId, branchId) : null;
 
     return {
       counter_active_ticket: counterActiveTicket || null,
@@ -853,8 +853,8 @@ class TicketService {
   /**
    * Consulta el estado de un turno para seguimiento móvil
    */
-  static getTicketTracking(ticketId) {
-    const ticket = db.prepare(`
+  static async getTicketTracking(ticketId) {
+    const ticket = await db.prepare(`
       SELECT t.*, s.name as service_name, s.estimated_minutes,
              b.name as branch_name, b.address as branch_address,
              c.name as counter_name, c.code as counter_code,
@@ -870,7 +870,7 @@ class TicketService {
     if (!ticket) throw new Error('TURNO_NO_ENCONTRADO');
 
     // Turno actualmente en atención en su servicio
-    const currentInService = db.prepare(`
+    const currentInService = await db.prepare(`
       SELECT t.ticket_number, c.name as counter_name
       FROM tickets t
       LEFT JOIN counters c ON t.counter_id = c.id
@@ -893,7 +893,7 @@ class TicketService {
   /**
    * Reinicia la cola diaria y resetea el turnero para iniciar desde el turno 1
    */
-  static resetDailyQueue({ branchId = 1, userId = null }) {
+  static async resetDailyQueue({ branchId = 1, userId = null }) {
     const now = new Date();
     const year = now.getFullYear();
     const month = String(now.getMonth() + 1).padStart(2, '0');
@@ -901,24 +901,24 @@ class TicketService {
     const today = `${year}-${month}-${day}`;
 
     // Finalizar todos los turnos pendientes o en atención para que la cola quede en 0
-    db.prepare(`
+    await db.prepare(`
       UPDATE tickets 
       SET status = 'FINALIZADO',
           completed_at = CURRENT_TIMESTAMP,
           notes = 'Reinicio manual de turnero diario'
       WHERE branch_id = ? 
-        AND (created_date = ? OR date(created_at, 'localtime') = ?)
+        AND (created_date = ? OR DATE(created_at) = ?)
         AND status IN ('ESPERANDO', 'LLAMADO', 'EN_ATENCION', 'PAUSADO')
     `).run(branchId, today, today);
 
     // Marcar los consecutivos anteriores de hoy para que la próxima secuencia comience en 1
-    db.prepare(`
+    await db.prepare(`
       UPDATE tickets
       SET created_date = created_date || '-RESET'
       WHERE branch_id = ? AND created_date = ?
     `).run(branchId, today);
 
-    AuditService.log({
+    await AuditService.log({
       userId,
       action: 'RESET_DAILY_QUEUE',
       entity: 'TICKETS',
@@ -932,10 +932,10 @@ class TicketService {
   /**
    * Activa automáticamente turnos programados cuya fecha es hoy o anterior
    */
-  static activateScheduledTicketsForToday() {
+  static async activateScheduledTicketsForToday() {
     try {
       const _now = new Date(); const today = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, '0')}-${String(_now.getDate()).padStart(2, '0')}`;
-      const info = db.prepare(`
+      const info = await db.prepare(`
         UPDATE tickets 
         SET status = 'ESPERANDO'
         WHERE status IN ('PROGRAMADO', 'CONFIRMADO')
@@ -950,7 +950,7 @@ class TicketService {
   /**
    * Crea una programación de turno para fecha hoy o futura
    */
-  static createScheduledTicket({
+  static async createScheduledTicket({
     branchId = 1,
     scheduledDate,
     appointmentTime = null,
@@ -962,22 +962,22 @@ class TicketService {
     notes = null,
     createdByUserId = null
   }) {
-    this.activateScheduledTicketsForToday();
+    await this.activateScheduledTicketsForToday();
 
     const _now = new Date(); const today = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, '0')}-${String(_now.getDate()).padStart(2, '0')}`;
     const targetDate = scheduledDate || today;
 
-    const branch = db.prepare('SELECT * FROM branches WHERE id = ? AND is_active = 1').get(branchId);
+    const branch = await db.prepare('SELECT * FROM branches WHERE id = ? AND is_active = 1').get(branchId);
     if (!branch) throw new Error('SEDE_NO_ENCONTRADA_O_INACTIVA');
 
-    const service = db.prepare('SELECT * FROM services WHERE id = ? AND is_active = 1').get(serviceId);
+    const service = await db.prepare('SELECT * FROM services WHERE id = ? AND is_active = 1').get(serviceId);
     if (!service) throw new Error('SERVICIO_NO_ENCONTRADO_O_INACTIVO');
 
     // 1. Obtener o crear paciente
-    const patient = this.getOrCreatePatient(patientData);
+    const patient = await this.getOrCreatePatient(patientData);
 
     // 2. Prevenir duplicados coincidentes en la misma fecha y servicio
-    const existingActive = db.prepare(`
+    const existingActive = await db.prepare(`
       SELECT t.*, s.name as service_name
       FROM tickets t
       JOIN services s ON t.service_id = s.id
@@ -998,14 +998,14 @@ class TicketService {
     }
 
     // 3. Determinar tipo de turno y prefijo
-    const priorityMinAge = SettingsService.get('EDAD_PRIORIDAD', branchId) || 60;
+    const priorityMinAge = await SettingsService.get('EDAD_PRIORIDAD', branchId) || 60;
     const isPriorityAuto = patient.age >= priorityMinAge || patient.is_priority_auto === 1;
     const finalTicketType = ticketType || (isPriorityAuto ? 'PRIORITARIO' : 'NORMAL');
     const isPriority = finalTicketType === 'PRIORITARIO' || finalTicketType === 'ESPECIAL';
 
-    const defaultNormalPrefix = SettingsService.get('PREFIJO_NORMAL', branchId) || 'A';
-    const defaultPriorityPrefix = SettingsService.get('PREFIJO_PRIORITARIO', branchId) || 'P';
-    const numDigits = SettingsService.get('DIGITOS_NUMERACION', branchId) || 3;
+    const defaultNormalPrefix = await SettingsService.get('PREFIJO_NORMAL', branchId) || 'A';
+    const defaultPriorityPrefix = await SettingsService.get('PREFIJO_PRIORITARIO', branchId) || 'P';
+    const numDigits = await SettingsService.get('DIGITOS_NUMERACION', branchId) || 3;
 
     const prefix = isPriority
       ? (service.priority_prefix || defaultPriorityPrefix)
@@ -1016,8 +1016,8 @@ class TicketService {
 
     let createdTicket = null;
 
-    const transaction = db.transaction(() => {
-      const lastSeq = db.prepare(`
+    const transaction = db.transaction(async () => {
+      const lastSeq = await db.prepare(`
         SELECT MAX(sequence_number) as max_seq
         FROM tickets
         WHERE branch_id = ? 
@@ -1029,7 +1029,7 @@ class TicketService {
       const formattedSeq = String(nextSequence).padStart(numDigits, '0');
       const ticketNumber = `${prefix}-${formattedSeq}`;
 
-      const res = db.prepare(`
+      const res = await db.prepare(`
         INSERT INTO tickets (
           ticket_number, branch_id, service_id, patient_id, counter_id, user_id,
           ticket_type, status, sequence_number, created_date, scheduled_date, appointment_time, notes
@@ -1052,7 +1052,7 @@ class TicketService {
 
       const ticketId = res.lastInsertRowid;
 
-      db.prepare(`
+      await db.prepare(`
         INSERT INTO ticket_events (ticket_id, from_status, to_status, user_id, counter_id, metadata)
         VALUES (?, NULL, ?, ?, ?, ?)
       `).run(
@@ -1063,7 +1063,7 @@ class TicketService {
         JSON.stringify({ scheduledDate: targetDate, appointmentTime, isPriority, notes })
       );
 
-      createdTicket = db.prepare(`
+      createdTicket = await db.prepare(`
         SELECT t.*, s.name as service_name, s.code as service_code, 
                p.full_name as patient_name, p.document_number, p.age as patient_age, p.phone as patient_phone,
                b.name as branch_name,
@@ -1079,9 +1079,9 @@ class TicketService {
       `).get(ticketId);
     });
 
-    transaction();
+    await transaction();
 
-    AuditService.log({
+    await AuditService.log({
       userId: createdByUserId,
       action: 'CREATE_SCHEDULED_TICKET',
       entity: 'TICKET',
@@ -1103,7 +1103,7 @@ class TicketService {
   /**
    * Obtiene la lista de turnos programados, calendario por días y métricas
    */
-  static getScheduleData({
+  static async getScheduleData({
     branchId = 1,
     startDate = null,
     endDate = null,
@@ -1114,7 +1114,7 @@ class TicketService {
     status = null,
     search = null
   }) {
-    this.activateScheduledTicketsForToday();
+    await this.activateScheduledTicketsForToday();
 
     const _now = new Date(); const today = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, '0')}-${String(_now.getDate()).padStart(2, '0')}`;
     const targetDate = date || today;
@@ -1158,7 +1158,7 @@ class TicketService {
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
-    const tickets = db.prepare(`
+    const tickets = await db.prepare(`
       SELECT t.*, s.name as service_name, s.code as service_code, s.estimated_minutes,
              p.full_name as patient_name, p.document_number, p.age as patient_age, p.phone as patient_phone,
              c.name as counter_name, c.code as counter_code,
@@ -1176,7 +1176,7 @@ class TicketService {
     `).all(...params);
 
     // Resumen de calendario por fecha
-    const calendarRows = db.prepare(`
+    const calendarRows = await db.prepare(`
       SELECT 
         COALESCE(scheduled_date, created_date) as day,
         COUNT(*) as total,
@@ -1199,7 +1199,7 @@ class TicketService {
     }
 
     // Métricas del día seleccionado
-    const metricsRow = db.prepare(`
+    const metricsRow = await db.prepare(`
       SELECT 
         COUNT(*) as total_dia,
         SUM(CASE WHEN status = 'PROGRAMADO' THEN 1 ELSE 0 END) as programados_hoy,
@@ -1212,7 +1212,7 @@ class TicketService {
         AND (scheduled_date = ? OR (scheduled_date IS NULL AND created_date = ?))
     `).get(branchId, targetDate, targetDate);
 
-    const activeCountersCount = db.prepare(`
+    const activeCountersCount = await db.prepare(`
       SELECT COUNT(DISTINCT counter_id) as count
       FROM tickets
       WHERE branch_id = ?
@@ -1231,7 +1231,7 @@ class TicketService {
     };
 
     // Desglose por Módulo / Consultorio para la fecha seleccionada
-    const allCounters = db.prepare(`
+    const allCounters = await db.prepare(`
       SELECT id, name, code, is_active FROM counters WHERE branch_id = ? ORDER BY code ASC
     `).all(branchId);
 
@@ -1271,7 +1271,7 @@ class TicketService {
   /**
    * Editar directamente cualquier turno que NO haya sido llamado aún
    */
-  static editUncalledTicket({
+  static async editUncalledTicket({
     ticketId,
     patientData = null,
     serviceId = null,
@@ -1283,9 +1283,9 @@ class TicketService {
     notes = null,
     modifiedByUserId = null
   }) {
-    this.activateScheduledTicketsForToday();
+    await this.activateScheduledTicketsForToday();
 
-    const ticket = db.prepare(`
+    const ticket = await db.prepare(`
       SELECT t.*, p.document_number, p.full_name as patient_name
       FROM tickets t
       JOIN patients p ON t.patient_id = p.id
@@ -1314,7 +1314,7 @@ class TicketService {
 
     let updatedPatientId = ticket.patient_id;
     if (patientData && patientData.documentNumber) {
-      const patient = this.getOrCreatePatient(patientData);
+      const patient = await this.getOrCreatePatient(patientData);
       updatedPatientId = patient.id;
     }
 
@@ -1333,7 +1333,7 @@ class TicketService {
       newStatus = 'ESPERANDO';
     }
 
-    db.prepare(`
+    await db.prepare(`
       UPDATE tickets
       SET patient_id = ?,
           service_id = ?,
@@ -1368,7 +1368,7 @@ class TicketService {
       status: newStatus
     };
 
-    db.prepare(`
+    await db.prepare(`
       INSERT INTO ticket_events (ticket_id, from_status, to_status, user_id, counter_id, metadata)
       VALUES (?, ?, ?, ?, ?, ?)
     `).run(
@@ -1380,7 +1380,7 @@ class TicketService {
       JSON.stringify({ action: 'EDIT_UNCALLED', before: beforeMetadata, after: afterMetadata })
     );
 
-    AuditService.log({
+    await AuditService.log({
       userId: modifiedByUserId,
       action: 'EDIT_UNCALLED_TICKET',
       entity: 'TICKET',
@@ -1392,7 +1392,7 @@ class TicketService {
       }
     });
 
-    return db.prepare(`
+    return await db.prepare(`
       SELECT t.*, s.name as service_name, s.code as service_code, 
              p.full_name as patient_name, p.document_number, p.age as patient_age, p.phone as patient_phone,
              c.name as counter_name, c.code as counter_code,
@@ -1409,8 +1409,8 @@ class TicketService {
   /**
    * Cancelar directamente cualquier turno que NO haya sido llamado aún
    */
-  static cancelUncalledTicket({ ticketId, reason = null, cancelledByUserId = null }) {
-    const ticket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(ticketId);
+  static async cancelUncalledTicket({ ticketId, reason = null, cancelledByUserId = null }) {
+    const ticket = await db.prepare('SELECT * FROM tickets WHERE id = ?').get(ticketId);
     if (!ticket) {
       throw new Error('TURNO_NO_ENCONTRADO');
     }
@@ -1424,7 +1424,7 @@ class TicketService {
     const cancelNote = reason ? `Cancelado: ${reason}` : 'Cancelado sin motivo especificado';
     const updatedNotes = ticket.notes ? `${ticket.notes} | ${cancelNote}` : cancelNote;
 
-    db.prepare(`
+    await db.prepare(`
       UPDATE tickets
       SET status = 'CANCELADO',
           notes = ?,
@@ -1432,7 +1432,7 @@ class TicketService {
       WHERE id = ?
     `).run(updatedNotes, ticketId);
 
-    db.prepare(`
+    await db.prepare(`
       INSERT INTO ticket_events (ticket_id, from_status, to_status, user_id, counter_id, metadata)
       VALUES (?, ?, 'CANCELADO', ?, ?, ?)
     `).run(
@@ -1443,7 +1443,7 @@ class TicketService {
       JSON.stringify({ reason, cancelledByUserId })
     );
 
-    AuditService.log({
+    await AuditService.log({
       userId: cancelledByUserId,
       action: 'CANCEL_UNCALLED_TICKET',
       entity: 'TICKET',

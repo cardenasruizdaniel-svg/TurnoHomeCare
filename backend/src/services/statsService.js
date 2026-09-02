@@ -4,13 +4,15 @@ class StatsService {
   /**
    * Obtiene las métricas KPI en tiempo real para el Dashboard
    */
-  static getDashboardStats(branchId = null, targetDate = null) {
-    const date = targetDate || new Date().toISOString().slice(0, 10);
+  static async getDashboardStats(branchId = null, targetDate = null) {
+    const _now = new Date();
+    const defaultToday = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, '0')}-${String(_now.getDate()).padStart(2, '0')}`;
+    const date = targetDate || defaultToday;
     const branchFilter = branchId ? 'AND branch_id = ?' : '';
     const params = branchId ? [date, branchId] : [date];
 
     // 1. Conteo general
-    const totals = db.prepare(`
+    const totalsRow = await db.prepare(`
       SELECT 
         COUNT(*) as total_tickets,
         SUM(CASE WHEN status = 'FINALIZADO' THEN 1 ELSE 0 END) as completed,
@@ -26,13 +28,15 @@ class StatsService {
       WHERE created_date = ? ${branchFilter}
     `).get(...params);
 
+    const totals = totalsRow || {};
     const avgWaitMinutes = totals.avg_wait_seconds ? Math.round(totals.avg_wait_seconds / 60) : 0;
     const avgAttentionMinutes = totals.avg_attention_seconds ? Math.round(totals.avg_attention_seconds / 60) : 0;
 
-    // 2. Turnos por hora (06:00 a 20:00)
-    const hourly = db.prepare(`
+    // 2. Turnos por hora
+    const hourExpr = db.isPostgres() ? "TO_CHAR(created_at, 'HH24')" : "strftime('%H', created_at)";
+    const hourly = await db.prepare(`
       SELECT 
-        strftime('%H', created_at) as hour,
+        ${hourExpr} as hour,
         COUNT(*) as count
       FROM tickets
       WHERE created_date = ? ${branchFilter}
@@ -41,7 +45,7 @@ class StatsService {
     `).all(...params);
 
     // 3. Distribución por servicio
-    const byService = db.prepare(`
+    const byService = await db.prepare(`
       SELECT 
         s.id as service_id,
         s.name as service_name,
@@ -55,7 +59,7 @@ class StatsService {
     `).all(date);
 
     // 4. Productividad por funcionario
-    const byUser = db.prepare(`
+    const byUser = await db.prepare(`
       SELECT 
         u.id as user_id,
         u.full_name,
@@ -69,21 +73,22 @@ class StatsService {
 
     return {
       date,
-      total_tickets: totals.total_tickets || 0,
-      completed: totals.completed || 0,
-      waiting: totals.waiting || 0,
-      in_progress: totals.in_progress || 0,
-      no_show: totals.no_show || 0,
-      cancelled: totals.cancelled || 0,
-      priority_count: totals.priority_count || 0,
-      normal_count: totals.normal_count || 0,
+      total_tickets: Number(totals.total_tickets || 0),
+      completed: Number(totals.completed || 0),
+      waiting: Number(totals.waiting || 0),
+      in_progress: Number(totals.in_progress || 0),
+      no_show: Number(totals.no_show || 0),
+      cancelled: Number(totals.cancelled || 0),
+      priority_count: Number(totals.priority_count || 0),
+      normal_count: Number(totals.normal_count || 0),
       avg_wait_minutes: avgWaitMinutes,
       avg_attention_minutes: avgAttentionMinutes,
-      hourly_distribution: hourly,
-      by_service: byService,
-      by_user: byUser.map(u => ({
+      hourly_distribution: hourly || [],
+      by_service: byService || [],
+      by_user: (byUser || []).map(u => ({
         ...u,
-        avg_attention_minutes: u.avg_att_sec ? Math.round(u.avg_att_sec / 60) : 0
+        attended_count: Number(u.attended_count || 0),
+        avg_attention_minutes: u.avg_att_sec ? Math.round(Number(u.avg_att_sec) / 60) : 0
       }))
     };
   }
@@ -91,7 +96,7 @@ class StatsService {
   /**
    * Consulta el historial detallado de turnos con filtros
    */
-  static getTicketHistory({
+  static async getTicketHistory({
     branchId = null,
     startDate = null,
     endDate = null,
@@ -154,20 +159,20 @@ class StatsService {
       params.push(`%${search}%`, `%${search}%`, `%${search}%`);
     }
 
-    // Total count for pagination
     const countSql = sql.replace(/SELECT\s+[\s\S]+?\s+FROM/, 'SELECT COUNT(*) as total FROM');
-    const totalCount = db.prepare(countSql).get(...params).total;
+    const countRow = await db.prepare(countSql).get(...params);
+    const totalCount = countRow ? Number(countRow.total || countRow.count || 0) : 0;
 
     sql += ' ORDER BY t.id DESC LIMIT ? OFFSET ?';
     params.push(limit, offset);
 
-    const rows = db.prepare(sql).all(...params);
+    const rows = await db.prepare(sql).all(...params);
 
     return {
       total: totalCount,
       limit,
       offset,
-      data: rows.map(r => ({
+      data: (rows || []).map(r => ({
         ...r,
         wait_time_minutes: r.wait_time_seconds ? (r.wait_time_seconds / 60).toFixed(1) : 0,
         attention_time_minutes: r.attention_time_seconds ? (r.attention_time_seconds / 60).toFixed(1) : 0
@@ -178,8 +183,8 @@ class StatsService {
   /**
    * Genera CSV para exportación rápida
    */
-  static exportTicketsCSV(filters) {
-    const result = this.getTicketHistory({ ...filters, limit: 5000, offset: 0 });
+  static async exportTicketsCSV(filters) {
+    const result = await this.getTicketHistory({ ...filters, limit: 5000, offset: 0 });
     const headers = [
       'ID', 'Numero_Turno', 'Tipo', 'Estado', 'Sede', 'Servicio',
       'Documento_Paciente', 'Nombre_Paciente', 'Edad', 'Telefono',
@@ -187,7 +192,7 @@ class StatsService {
       'Hora_Finalizacion', 'Tiempo_Espera_Min', 'Tiempo_Atencion_Min', 'Veces_Llamado'
     ];
 
-    const rows = result.data.map(t => [
+    const rows = (result.data || []).map(t => [
       t.id,
       `"${t.ticket_number}"`,
       `"${t.ticket_type}"`,

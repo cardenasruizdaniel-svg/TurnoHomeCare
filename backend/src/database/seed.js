@@ -6,7 +6,7 @@ async function seedDatabase() {
   await initDatabase();
   console.log(' Sembrando datos iniciales en DEATurnos...');
 
-  const transaction = db.transaction(() => {
+  const transaction = db.transaction(async () => {
     // 1. Roles
     const insertRole = db.prepare('INSERT OR IGNORE INTO roles (id, name, description) VALUES (?, ?, ?)');
     insertRole.run(1, 'ADMIN', 'Administrador total del sistema');
@@ -148,7 +148,7 @@ async function seedDatabase() {
     `).run();
   });
 
-  transaction();
+  await transaction();
   console.log(' Base de datos sembrada con éxito.');
 }
 

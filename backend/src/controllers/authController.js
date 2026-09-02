@@ -5,7 +5,7 @@ const { JWT_SECRET } = require('../middlewares/auth');
 const AuditService = require('../services/auditService');
 
 class AuthController {
-  static login(req, res) {
+  static async login(req, res) {
     try {
       const { username, password } = req.body;
 
@@ -13,7 +13,7 @@ class AuthController {
         return res.status(400).json({ success: false, error: 'CAMPOS_REQUERIDOS', message: 'Usuario y contraseña requeridos' });
       }
 
-      const user = db.prepare(`
+      const user = await db.prepare(`
         SELECT u.*, r.name as role_name, b.name as branch_name
         FROM users u
         JOIN roles r ON u.role_id = r.id
@@ -31,7 +31,7 @@ class AuthController {
       }
 
       // Actualizar último login
-      db.prepare('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?').run(user.id);
+      await db.prepare('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?').run(user.id);
 
       const tokenPayload = {
         id: user.id,
@@ -43,7 +43,7 @@ class AuthController {
 
       const token = jwt.sign(tokenPayload, JWT_SECRET, { expiresIn: '12h' });
 
-      AuditService.log({
+      await AuditService.log({
         userId: user.id,
         action: 'USER_LOGIN',
         entity: 'USER',
@@ -71,9 +71,9 @@ class AuthController {
     }
   }
 
-  static getMe(req, res) {
+  static async getMe(req, res) {
     try {
-      const user = db.prepare(`
+      const user = await db.prepare(`
         SELECT u.id, u.username, u.full_name, u.email, u.branch_id, r.name as role_name, b.name as branch_name
         FROM users u
         JOIN roles r ON u.role_id = r.id

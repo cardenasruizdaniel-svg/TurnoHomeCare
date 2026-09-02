@@ -4,11 +4,11 @@ const AuditService = require('../services/auditService');
 const db = require('../config/database');
 
 class SettingsController {
-  static getAll(req, res) {
+  static async getAll(req, res) {
     try {
       const branchId = req.query.branchId ? Number(req.query.branchId) : null;
-      const settings = SettingsService.getAll(branchId);
-      const company = db.prepare('SELECT * FROM companies WHERE id = 1').get();
+      const settings = await SettingsService.getAll(branchId);
+      const company = await db.prepare('SELECT * FROM companies WHERE id = 1').get();
 
       res.json({
         success: true,
@@ -20,16 +20,16 @@ class SettingsController {
     }
   }
 
-  static updateBatch(req, res) {
+  static async updateBatch(req, res) {
     try {
       const { settings, company, branchId = null } = req.body;
 
       if (settings && typeof settings === 'object') {
-        SettingsService.updateBatch(settings, branchId ? Number(branchId) : null);
+        await SettingsService.updateBatch(settings, branchId ? Number(branchId) : null);
       }
 
       if (company && typeof company === 'object') {
-        db.prepare(`
+        await db.prepare(`
           UPDATE companies
           SET name = COALESCE(?, name),
               nit = COALESCE(?, nit),
@@ -43,7 +43,7 @@ class SettingsController {
         `).run(company.name, company.nit, company.logo_url, company.primary_color, company.secondary_color, company.slogan || null, company.accent_color || null);
       }
 
-      AuditService.log({
+      await AuditService.log({
         userId: req.user ? req.user.id : null,
         action: 'UPDATE_SETTINGS',
         entity: 'SETTINGS',
@@ -58,11 +58,11 @@ class SettingsController {
     }
   }
 
-  static resetDailyQueue(req, res) {
+  static async resetDailyQueue(req, res) {
     try {
       const branchId = req.body.branchId ? Number(req.body.branchId) : 1;
       const TicketService = require('../services/ticketService');
-      const result = TicketService.resetDailyQueue({
+      const result = await TicketService.resetDailyQueue({
         branchId,
         userId: req.user ? req.user.id : null
       });
@@ -76,10 +76,10 @@ class SettingsController {
     }
   }
 
-  static downloadBackup(req, res) {
+  static async downloadBackup(req, res) {
     try {
       const BackupService = require('../services/backupService');
-      const buffer = BackupService.getDatabaseBuffer();
+      const buffer = await BackupService.getDatabaseBuffer();
       if (!buffer) {
         return res.status(404).json({ success: false, error: 'NO_DATABASE_FILE' });
       }
@@ -93,10 +93,10 @@ class SettingsController {
     }
   }
 
-  static exportJsonBackup(req, res) {
+  static async exportJsonBackup(req, res) {
     try {
       const BackupService = require('../services/backupService');
-      const data = BackupService.exportFullDataJson();
+      const data = await BackupService.exportFullDataJson();
       const today = new Date().toISOString().slice(0, 10);
       res.setHeader('Content-Disposition', `attachment; filename="deaturnos_full_backup_${today}.json"`);
       res.setHeader('Content-Type', 'application/json');
@@ -106,7 +106,7 @@ class SettingsController {
     }
   }
 
-  static importJsonBackup(req, res) {
+  static async importJsonBackup(req, res) {
     try {
       const BackupService = require('../services/backupService');
       const { backupData } = req.body;
@@ -115,7 +115,7 @@ class SettingsController {
       }
 
       const parsedData = typeof backupData === 'string' ? JSON.parse(backupData) : backupData;
-      BackupService.importFullDataJson(parsedData);
+      await BackupService.importFullDataJson(parsedData);
       res.json({ success: true, message: 'Base de datos y configuraciones restauradas exitosamente desde el respaldo.' });
     } catch (err) {
       console.error('Error importando respaldo JSON:', err);
@@ -123,10 +123,10 @@ class SettingsController {
     }
   }
 
-  static createBackupSnapshot(req, res) {
+  static async createBackupSnapshot(req, res) {
     try {
       const BackupService = require('../services/backupService');
-      const backupInfo = BackupService.createBackup();
+      const backupInfo = await BackupService.createBackup();
       if (!backupInfo) {
         return res.status(500).json({ success: false, error: 'ERROR_CREATING_BACKUP' });
       }
@@ -136,7 +136,7 @@ class SettingsController {
     }
   }
 
-  static syncOfficialData(req, res) {
+  static async syncOfficialData(req, res) {
     try {
       const syncServicesAndCounters = require('../database/syncServicesAndCounters');
       syncServicesAndCounters();

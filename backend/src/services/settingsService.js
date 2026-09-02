@@ -4,13 +4,13 @@ class SettingsService {
   /**
    * Obtiene una configuración por clave, buscando primero a nivel de sede y luego global.
    */
-  static get(key, branchId = null) {
+  static async get(key, branchId = null) {
     let row = null;
     if (branchId) {
-      row = db.prepare('SELECT * FROM settings WHERE key = ? AND branch_id = ?').get(key, branchId);
+      row = await db.prepare('SELECT * FROM settings WHERE key = ? AND branch_id = ?').get(key, branchId);
     }
     if (!row) {
-      row = db.prepare('SELECT * FROM settings WHERE key = ? AND branch_id IS NULL').get(key);
+      row = await db.prepare('SELECT * FROM settings WHERE key = ? AND branch_id IS NULL').get(key);
     }
     if (!row) return null;
 
@@ -20,11 +20,11 @@ class SettingsService {
   /**
    * Obtiene todas las configuraciones con sobreescritura de sede.
    */
-  static getAll(branchId = null) {
-    const globals = db.prepare('SELECT * FROM settings WHERE branch_id IS NULL').all();
+  static async getAll(branchId = null) {
+    const globals = await db.prepare('SELECT * FROM settings WHERE branch_id IS NULL').all();
     const result = {};
 
-    globals.forEach(g => {
+    (globals || []).forEach(g => {
       result[g.key] = {
         key: g.key,
         value: this.castValue(g.value, g.data_type),
@@ -35,8 +35,8 @@ class SettingsService {
     });
 
     if (branchId) {
-      const branchSettings = db.prepare('SELECT * FROM settings WHERE branch_id = ?').all(branchId);
-      branchSettings.forEach(bs => {
+      const branchSettings = await db.prepare('SELECT * FROM settings WHERE branch_id = ?').all(branchId);
+      (branchSettings || []).forEach(bs => {
         result[bs.key] = {
           key: bs.key,
           value: this.castValue(bs.value, bs.data_type),
@@ -53,17 +53,17 @@ class SettingsService {
   /**
    * Guarda o actualiza una configuración
    */
-  static set(key, value, description = null, dataType = 'string', branchId = null) {
+  static async set(key, value, description = null, dataType = 'string', branchId = null) {
     const stringValue = typeof value === 'object' ? JSON.stringify(value) : String(value);
     const existing = branchId
-      ? db.prepare('SELECT id FROM settings WHERE key = ? AND branch_id = ?').get(key, branchId)
-      : db.prepare('SELECT id FROM settings WHERE key = ? AND branch_id IS NULL').get(key);
+      ? await db.prepare('SELECT id FROM settings WHERE key = ? AND branch_id = ?').get(key, branchId)
+      : await db.prepare('SELECT id FROM settings WHERE key = ? AND branch_id IS NULL').get(key);
 
     if (existing) {
-      db.prepare('UPDATE settings SET value = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+      await db.prepare('UPDATE settings SET value = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
         .run(stringValue, existing.id);
     } else {
-      db.prepare('INSERT INTO settings (branch_id, key, value, description, data_type) VALUES (?, ?, ?, ?, ?)')
+      await db.prepare('INSERT INTO settings (branch_id, key, value, description, data_type) VALUES (?, ?, ?, ?, ?)')
         .run(branchId, key, stringValue, description, dataType);
     }
   }
@@ -71,37 +71,33 @@ class SettingsService {
   /**
    * Actualiza múltiples configuraciones en lote
    */
-  static updateBatch(settingsMap, branchId = null) {
-    const transaction = db.transaction((items) => {
-      for (const [key, val] of Object.entries(items)) {
-        const strVal = typeof val === 'object' ? JSON.stringify(val) : String(val);
-        const dtype = typeof val === 'object' ? 'json' : (typeof val === 'number' ? 'number' : typeof val === 'boolean' ? 'boolean' : 'string');
+  static async updateBatch(settingsMap, branchId = null) {
+    for (const [key, val] of Object.entries(settingsMap || {})) {
+      const strVal = typeof val === 'object' ? JSON.stringify(val) : String(val);
+      const dtype = typeof val === 'object' ? 'json' : (typeof val === 'number' ? 'number' : typeof val === 'boolean' ? 'boolean' : 'string');
 
-        const existing = branchId
-          ? db.prepare('SELECT id FROM settings WHERE key = ? AND branch_id = ?').get(key, branchId)
-          : db.prepare('SELECT id FROM settings WHERE key = ? AND branch_id IS NULL').get(key);
+      const existing = branchId
+        ? await db.prepare('SELECT id FROM settings WHERE key = ? AND branch_id = ?').get(key, branchId)
+        : await db.prepare('SELECT id FROM settings WHERE key = ? AND branch_id IS NULL').get(key);
 
-        if (existing) {
-          db.prepare('UPDATE settings SET value = ?, data_type = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
-            .run(strVal, dtype, existing.id);
-        } else {
-          db.prepare('INSERT INTO settings (branch_id, key, value, description, data_type) VALUES (?, ?, ?, ?, ?)')
-            .run(branchId, key, strVal, '', dtype);
-        }
+      if (existing) {
+        await db.prepare('UPDATE settings SET value = ?, data_type = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+          .run(strVal, dtype, existing.id);
+      } else {
+        await db.prepare('INSERT INTO settings (branch_id, key, value, description, data_type) VALUES (?, ?, ?, ?, ?)')
+          .run(branchId, key, strVal, '', dtype);
       }
-    });
-
-    transaction(settingsMap);
+    }
   }
 
   static castValue(val, type) {
     if (val === null || val === undefined) return null;
     if (type === 'number') return Number(val);
     if (type === 'boolean') return val === 'true' || val === '1' || val === 1 || val === true;
-    if (type === 'json' || (typeof val === 'string' && (val.trim().startsWith('[') || val.trim().startsWith('{')))) {
+    if (type === 'json') {
       try {
         return JSON.parse(val);
-      } catch {
+      } catch (e) {
         return val;
       }
     }

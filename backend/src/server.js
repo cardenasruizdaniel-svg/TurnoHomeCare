@@ -71,15 +71,10 @@ const PORT = process.env.PORT || 5000;
 async function startServer() {
   await db.init();
   try {
-    const usersCount = db.prepare('SELECT COUNT(*) as count FROM users').get();
-    if (!usersCount || usersCount.count === 0) {
-      await seedDatabase();
-    }
+    await initDatabase();
     await syncServicesAndCounters();
   } catch (e) {
-    await initDatabase();
-    await seedDatabase();
-    await syncServicesAndCounters();
+    console.error('Error durante la inicialización del servidor:', e);
   }
 
   server.listen(PORT, async () => {

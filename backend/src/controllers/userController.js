@@ -3,9 +3,9 @@ const db = require('../config/database');
 const AuditService = require('../services/auditService');
 
 class UserController {
-  static getAll(req, res) {
+  static async getAll(req, res) {
     try {
-      const users = db.prepare(`
+      const users = await db.prepare(`
         SELECT u.id, u.username, u.email, u.full_name, u.is_active, u.last_login, u.created_at,
                r.id as role_id, r.name as role_name,
                b.id as branch_id, b.name as branch_name
@@ -21,16 +21,16 @@ class UserController {
     }
   }
 
-  static getRoles(req, res) {
+  static async getRoles(req, res) {
     try {
-      const roles = db.prepare('SELECT * FROM roles ORDER BY id ASC').all();
+      const roles = await db.prepare('SELECT * FROM roles ORDER BY id ASC').all();
       res.json({ success: true, roles });
     } catch (err) {
       res.status(500).json({ success: false, error: err.message });
     }
   }
 
-  static create(req, res) {
+  static async create(req, res) {
     try {
       const { branch_id, role_id, username, email, password, full_name } = req.body;
 
@@ -38,18 +38,18 @@ class UserController {
         return res.status(400).json({ success: false, error: 'CAMPOS_REQUERIDOS', message: 'Usuario, contraseña, nombre y rol son obligatorios' });
       }
 
-      const existing = db.prepare('SELECT id FROM users WHERE username = ? OR (email = ? AND email IS NOT NULL)').get(username, email);
+      const existing = await db.prepare('SELECT id FROM users WHERE username = ? OR (email = ? AND email IS NOT NULL)').get(username, email);
       if (existing) {
         return res.status(400).json({ success: false, error: 'USUARIO_O_EMAIL_DUPLICADO', message: 'El nombre de usuario o correo ya está registrado' });
       }
 
       const hash = bcrypt.hashSync(password, 10);
-      const result = db.prepare(`
+      const result = await db.prepare(`
         INSERT INTO users (branch_id, role_id, username, email, password_hash, full_name, is_active)
         VALUES (?, ?, ?, ?, ?, ?, 1)
       `).run(branch_id ? Number(branch_id) : null, Number(role_id), username.trim(), email ? email.trim() : null, hash, full_name.trim());
 
-      AuditService.log({
+      await AuditService.log({
         userId: req.user.id,
         action: 'CREATE_USER',
         entity: 'USER',
@@ -63,7 +63,7 @@ class UserController {
     }
   }
 
-  static update(req, res) {
+  static async update(req, res) {
     try {
       const { id } = req.params;
       const { branch_id, role_id, email, password, full_name, is_active } = req.body;
@@ -83,7 +83,7 @@ class UserController {
         params.splice(3, 0, hash);
       }
 
-      db.prepare(`
+      await db.prepare(`
         UPDATE users
         SET branch_id = COALESCE(?, branch_id),
             role_id = COALESCE(?, role_id),
@@ -102,7 +102,7 @@ class UserController {
         id
       );
 
-      AuditService.log({
+      await AuditService.log({
         userId: req.user.id,
         action: 'UPDATE_USER',
         entity: 'USER',
@@ -116,7 +116,7 @@ class UserController {
     }
   }
 
-  static toggleActive(req, res) {
+  static async toggleActive(req, res) {
     try {
       const { id } = req.params;
       const userId = Number(id);
@@ -129,15 +129,15 @@ class UserController {
         });
       }
 
-      const user = db.prepare('SELECT id, full_name, username, is_active FROM users WHERE id = ?').get(userId);
+      const user = await db.prepare('SELECT id, full_name, username, is_active FROM users WHERE id = ?').get(userId);
       if (!user) {
         return res.status(404).json({ success: false, error: 'USUARIO_NO_ENCONTRADO', message: 'El usuario no existe.' });
       }
 
       const newStatus = user.is_active ? 0 : 1;
-      db.prepare('UPDATE users SET is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(newStatus, userId);
+      await db.prepare('UPDATE users SET is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(newStatus, userId);
 
-      AuditService.log({
+      await AuditService.log({
         userId: req.user.id,
         action: newStatus === 1 ? 'ACTIVATE_USER' : 'INACTIVATE_USER',
         entity: 'USER',
@@ -155,12 +155,12 @@ class UserController {
     }
   }
 
-  static checkMovements(req, res) {
+  static async checkMovements(req, res) {
     try {
       const { id } = req.params;
       const userId = Number(id);
-      const ticketsCount = db.prepare('SELECT COUNT(*) as count FROM tickets WHERE user_id = ?').get(userId)?.count || 0;
-      const eventsCount = db.prepare('SELECT COUNT(*) as count FROM ticket_events WHERE user_id = ?').get(userId)?.count || 0;
+      const ticketsCount = await db.prepare('SELECT COUNT(*) as count FROM tickets WHERE user_id = ?').get(userId)?.count || 0;
+      const eventsCount = await db.prepare('SELECT COUNT(*) as count FROM ticket_events WHERE user_id = ?').get(userId)?.count || 0;
       const hasMovements = (ticketsCount + eventsCount) > 0;
 
       res.json({
@@ -174,7 +174,7 @@ class UserController {
     }
   }
 
-  static delete(req, res) {
+  static async delete(req, res) {
     try {
       const { id } = req.params;
       const userId = Number(id);
@@ -187,14 +187,14 @@ class UserController {
         });
       }
 
-      const user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
+      const user = await db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
       if (!user) {
         return res.status(404).json({ success: false, error: 'USUARIO_NO_ENCONTRADO', message: 'El usuario no existe.' });
       }
 
       // Verificar si tiene movimientos en turnos o historial de eventos
-      const ticketsCount = db.prepare('SELECT COUNT(*) as count FROM tickets WHERE user_id = ?').get(userId)?.count || 0;
-      const eventsCount = db.prepare('SELECT COUNT(*) as count FROM ticket_events WHERE user_id = ?').get(userId)?.count || 0;
+      const ticketsCount = await db.prepare('SELECT COUNT(*) as count FROM tickets WHERE user_id = ?').get(userId)?.count || 0;
+      const eventsCount = await db.prepare('SELECT COUNT(*) as count FROM ticket_events WHERE user_id = ?').get(userId)?.count || 0;
       const hasMovements = (ticketsCount + eventsCount) > 0;
 
       if (hasMovements) {
@@ -208,11 +208,11 @@ class UserController {
       }
 
       // Si no tiene movimientos, desasociar de módulos y borrar
-      db.prepare('UPDATE counters SET current_user_id = NULL WHERE current_user_id = ?').run(userId);
-      db.prepare('UPDATE audit_logs SET user_id = NULL WHERE user_id = ?').run(userId);
-      db.prepare('DELETE FROM users WHERE id = ?').run(userId);
+      await db.prepare('UPDATE counters SET current_user_id = NULL WHERE current_user_id = ?').run(userId);
+      await db.prepare('UPDATE audit_logs SET user_id = NULL WHERE user_id = ?').run(userId);
+      await db.prepare('DELETE FROM users WHERE id = ?').run(userId);
 
-      AuditService.log({
+      await AuditService.log({
         userId: req.user.id,
         action: 'DELETE_USER',
         entity: 'USER',

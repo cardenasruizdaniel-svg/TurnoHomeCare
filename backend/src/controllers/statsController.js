@@ -1,24 +1,24 @@
 const StatsService = require('../services/statsService');
 
 class StatsController {
-  static getDashboard(req, res) {
+  static async getDashboard(req, res) {
     try {
       const branchId = req.query.branchId ? Number(req.query.branchId) : null;
       const date = req.query.date || null;
-      const stats = StatsService.getDashboardStats(branchId, date);
+      const stats = await StatsService.getDashboardStats(branchId, date);
       res.json({ success: true, stats });
     } catch (err) {
       res.status(500).json({ success: false, error: err.message });
     }
   }
 
-  static getHistory(req, res) {
+  static async getHistory(req, res) {
     try {
       const {
         branchId, startDate, endDate, serviceId, status, ticketType, userId, search, limit = 50, offset = 0
       } = req.query;
 
-      const history = StatsService.getTicketHistory({
+      const history = await StatsService.getTicketHistory({
         branchId: branchId ? Number(branchId) : null,
         startDate,
         endDate,
@@ -37,10 +37,10 @@ class StatsController {
     }
   }
 
-  static exportCSV(req, res) {
+  static async exportCSV(req, res) {
     try {
       const { branchId, startDate, endDate, serviceId, status, ticketType, userId, search } = req.query;
-      const csv = StatsService.exportTicketsCSV({
+      const csv = await StatsService.exportTicketsCSV({
         branchId: branchId ? Number(branchId) : null,
         startDate,
         endDate,

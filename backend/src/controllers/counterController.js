@@ -2,7 +2,7 @@ const db = require('../config/database');
 const AuditService = require('../services/auditService');
 
 class CounterController {
-  static getAll(req, res) {
+  static async getAll(req, res) {
     try {
       const branchId = req.query.branchId ? Number(req.query.branchId) : null;
       let sql = `
@@ -18,10 +18,10 @@ class CounterController {
       }
       sql += ' ORDER BY c.code ASC';
 
-      const counters = db.prepare(sql).all(...params);
+      const counters = await db.prepare(sql).all(...params);
 
       // Obtener servicios vinculados a cada módulo
-      const getServicesStmt = db.prepare(`
+      const getServicesStmt = await db.prepare(`
         SELECT s.id, s.name, s.code, s.letter_prefix
         FROM counter_services cs
         JOIN services s ON cs.service_id = s.id
@@ -39,7 +39,7 @@ class CounterController {
     }
   }
 
-  static create(req, res) {
+  static async create(req, res) {
     try {
       const { branch_id = 1, code, name, service_ids = [] } = req.body;
 
@@ -48,23 +48,23 @@ class CounterController {
       }
 
       let counterId = null;
-      const transaction = db.transaction(() => {
-        const result = db.prepare(`
+      const transaction = db.transaction(async () => {
+        const result = await db.prepare(`
           INSERT INTO counters (branch_id, code, name, is_active)
           VALUES (?, ?, ?, 1)
         `).run(Number(branch_id), code.toUpperCase(), name);
 
         counterId = result.lastInsertRowid;
 
-        const insertCS = db.prepare('INSERT INTO counter_services (counter_id, service_id) VALUES (?, ?)');
+        const insertCS = await db.prepare('INSERT INTO counter_services (counter_id, service_id) VALUES (?, ?)');
         for (const sId of service_ids) {
           insertCS.run(counterId, Number(sId));
         }
       });
 
-      transaction();
+      await transaction();
 
-      AuditService.log({
+      await AuditService.log({
         userId: req.user.id,
         action: 'CREATE_COUNTER',
         entity: 'COUNTER',
@@ -78,13 +78,13 @@ class CounterController {
     }
   }
 
-  static update(req, res) {
+  static async update(req, res) {
     try {
       const { id } = req.params;
       const { branch_id, code, name, is_active, service_ids } = req.body;
 
-      const transaction = db.transaction(() => {
-        db.prepare(`
+      const transaction = db.transaction(async () => {
+        await db.prepare(`
           UPDATE counters
           SET branch_id = COALESCE(?, branch_id),
               code = COALESCE(?, code),
@@ -101,17 +101,17 @@ class CounterController {
         );
 
         if (Array.isArray(service_ids)) {
-          db.prepare('DELETE FROM counter_services WHERE counter_id = ?').run(id);
-          const insertCS = db.prepare('INSERT INTO counter_services (counter_id, service_id) VALUES (?, ?)');
+          await db.prepare('DELETE FROM counter_services WHERE counter_id = ?').run(id);
+          const insertCS = await db.prepare('INSERT INTO counter_services (counter_id, service_id) VALUES (?, ?)');
           for (const sId of service_ids) {
             insertCS.run(id, Number(sId));
           }
         }
       });
 
-      transaction();
+      await transaction();
 
-      AuditService.log({
+      await AuditService.log({
         userId: req.user ? req.user.id : null,
         action: 'UPDATE_COUNTER',
         entity: 'COUNTER',
@@ -125,19 +125,19 @@ class CounterController {
     }
   }
 
-  static delete(req, res) {
+  static async delete(req, res) {
     try {
       const { id } = req.params;
-      const existing = db.prepare('SELECT * FROM counters WHERE id = ?').get(id);
+      const existing = await db.prepare('SELECT * FROM counters WHERE id = ?').get(id);
       if (!existing) return res.status(404).json({ success: false, error: 'MODULO_NO_ENCONTRADO' });
 
-      const transaction = db.transaction(() => {
-        db.prepare('DELETE FROM counter_services WHERE counter_id = ?').run(id);
-        db.prepare('DELETE FROM counters WHERE id = ?').run(id);
+      const transaction = db.transaction(async () => {
+        await db.prepare('DELETE FROM counter_services WHERE counter_id = ?').run(id);
+        await db.prepare('DELETE FROM counters WHERE id = ?').run(id);
       });
-      transaction();
+      await transaction();
 
-      AuditService.log({
+      await AuditService.log({
         userId: req.user ? req.user.id : null,
         action: 'DELETE_COUNTER',
         entity: 'COUNTER',

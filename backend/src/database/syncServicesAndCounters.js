@@ -125,11 +125,13 @@ const officialCounters = [
 
 async function syncServicesAndCounters() {
   try {
+    await db.init();
+
     // 0. Sincronizar Sedes Oficiales HomeCare (Únicamente si no existen)
     for (const b of officialBranches) {
-      const existing = db.prepare("SELECT id FROM branches WHERE id = ? OR code = ?").get(b.id, b.code);
+      const existing = await db.prepare("SELECT id FROM branches WHERE id = ? OR code = ?").get(b.id, b.code);
       if (!existing) {
-        db.prepare(`
+        await db.prepare(`
           INSERT INTO branches (id, company_id, code, name, address, phone, business_hours, qr_code_slug, is_active)
           VALUES (?, 1, ?, ?, ?, ?, ?, ?, 1)
         `).run(b.id, b.code, b.name, b.address, b.phone, b.business_hours, b.qr_code_slug);
@@ -139,17 +141,17 @@ async function syncServicesAndCounters() {
     // 1. BORRAR todos los servicios que no estén en la lista oficial de los 10 solicitados
     const officialCodes = officialServices.map(s => s.code);
     const placeholders = officialCodes.map(() => '?').join(',');
-    db.prepare(`DELETE FROM counter_services WHERE service_id IN (SELECT id FROM services WHERE code NOT IN (${placeholders}, 'CM', 'HPED'))`).run(...officialCodes);
-    db.prepare(`DELETE FROM services WHERE code NOT IN (${placeholders}, 'CM', 'HPED')`).run(...officialCodes);
+    await db.prepare(`DELETE FROM counter_services WHERE service_id IN (SELECT id FROM services WHERE code NOT IN (${placeholders}, 'CM', 'HPED'))`).run(...officialCodes);
+    await db.prepare(`DELETE FROM services WHERE code NOT IN (${placeholders}, 'CM', 'HPED')`).run(...officialCodes);
 
     // 2. Insertar o actualizar los 10 servicios oficiales requeridos
     for (const s of officialServices) {
-      const existing = db.prepare("SELECT id FROM services WHERE code = ? OR (code = 'CM' AND ? = 'CME') OR (code = 'HPED' AND ? = 'PED')").get(s.code, s.code, s.code);
+      const existing = await db.prepare("SELECT id FROM services WHERE code = ? OR (code = 'CM' AND ? = 'CME') OR (code = 'HPED' AND ? = 'PED')").get(s.code, s.code, s.code);
       if (existing) {
-        db.prepare("UPDATE services SET code = ?, name = ?, description = ?, letter_prefix = ?, priority_prefix = ?, estimated_minutes = ?, is_active = 1, order_index = ? WHERE id = ?")
+        await db.prepare("UPDATE services SET code = ?, name = ?, description = ?, letter_prefix = ?, priority_prefix = ?, estimated_minutes = ?, is_active = 1, order_index = ? WHERE id = ?")
           .run(s.code, s.name, s.description, s.letter_prefix, s.priority_prefix, s.estimated_minutes, s.order_index, existing.id);
       } else {
-        db.prepare("INSERT INTO services (company_id, code, name, description, letter_prefix, priority_prefix, estimated_minutes, is_active, order_index) VALUES (1, ?, ?, ?, ?, ?, ?, 1, ?)")
+        await db.prepare("INSERT INTO services (company_id, code, name, description, letter_prefix, priority_prefix, estimated_minutes, is_active, order_index) VALUES (1, ?, ?, ?, ?, ?, ?, 1, ?)")
           .run(s.code, s.name, s.description, s.letter_prefix, s.priority_prefix, s.estimated_minutes, s.order_index);
       }
     }
@@ -157,122 +159,70 @@ async function syncServicesAndCounters() {
     // 3. BORRAR todos los módulos que no estén en la lista oficial de los 5 requeridos
     const counterCodes = officialCounters.map(c => c.code);
     const cPlaceholders = counterCodes.map(() => '?').join(',');
-    db.prepare(`DELETE FROM counter_services WHERE counter_id IN (SELECT id FROM counters WHERE code NOT IN (${cPlaceholders}))`).run(...counterCodes);
-    db.prepare(`DELETE FROM counters WHERE code NOT IN (${cPlaceholders})`).run(...counterCodes);
+    await db.prepare(`DELETE FROM counter_services WHERE counter_id IN (SELECT id FROM counters WHERE code NOT IN (${cPlaceholders}))`).run(...counterCodes);
+    await db.prepare(`DELETE FROM counters WHERE code NOT IN (${cPlaceholders})`).run(...counterCodes);
 
     // 4. Insertar o actualizar los 5 consultorios/módulos oficiales requeridos
     for (const c of officialCounters) {
-      const existing = db.prepare("SELECT id FROM counters WHERE code = ?").get(c.code);
+      const existing = await db.prepare("SELECT id FROM counters WHERE code = ?").get(c.code);
       if (!existing) {
-        db.prepare("INSERT INTO counters (branch_id, code, name, is_active) VALUES (1, ?, ?, 1)")
+        await db.prepare("INSERT INTO counters (branch_id, code, name, is_active) VALUES (1, ?, ?, 1)")
           .run(c.code, c.name);
       } else {
-        db.prepare("UPDATE counters SET name = ?, is_active = 1 WHERE id = ?").run(c.name, existing.id);
+        await db.prepare("UPDATE counters SET name = ?, is_active = 1 WHERE id = ?").run(c.name, existing.id);
       }
     }
 
-    const allServices = db.prepare("SELECT id, code FROM services WHERE is_active = 1").all();
-    const allCounters = db.prepare("SELECT id, code FROM counters WHERE is_active = 1").all();
+    const allServices = await db.prepare("SELECT id, code FROM services WHERE is_active = 1").all();
+    const allCounters = await db.prepare("SELECT id, code FROM counters WHERE is_active = 1").all();
 
     const counterMap = {};
-    allCounters.forEach(c => { counterMap[c.code] = c.id; });
+    (allCounters || []).forEach(c => { counterMap[c.code] = c.id; });
 
     const serviceMap = {};
-    allServices.forEach(s => { serviceMap[s.code] = s.id; });
-
-    const insertCounterService = db.prepare("INSERT OR IGNORE INTO counter_services (counter_id, service_id) VALUES (?, ?)");
+    (allServices || []).forEach(s => { serviceMap[s.code] = s.id; });
 
     // Ventanilla 1 y 2 atienden los 10 servicios
     if (counterMap["MOD-1"]) {
-      allServices.forEach(s => insertCounterService.run(counterMap["MOD-1"], s.id));
+      for (const s of (allServices || [])) {
+        await db.prepare("INSERT INTO counter_services (counter_id, service_id) VALUES (?, ?) ON CONFLICT DO NOTHING").run(counterMap["MOD-1"], s.id);
+      }
     }
     if (counterMap["MOD-2"]) {
-      allServices.forEach(s => insertCounterService.run(counterMap["MOD-2"], s.id));
+      for (const s of (allServices || [])) {
+        await db.prepare("INSERT INTO counter_services (counter_id, service_id) VALUES (?, ?) ON CONFLICT DO NOTHING").run(counterMap["MOD-2"], s.id);
+      }
     }
 
     // Entrevista 1 y 2 atienden Psicología y Nutrición
-    ["ENT-1", "ENT-2"].forEach(entCode => {
+    for (const entCode of ["ENT-1", "ENT-2"]) {
       if (counterMap[entCode]) {
-        ["PSI", "NUT"].forEach(code => {
-          if (serviceMap[code]) insertCounterService.run(counterMap[entCode], serviceMap[code]);
-        });
+        for (const code of ["PSI", "NUT"]) {
+          if (serviceMap[code]) {
+            await db.prepare("INSERT INTO counter_services (counter_id, service_id) VALUES (?, ?) ON CONFLICT DO NOTHING").run(counterMap[entCode], serviceMap[code]);
+          }
+        }
       }
-    });
+    }
 
     // Consultorio 1 atiende Consulta General, Cita Especializada, Medicina General, Pediatría, Terapias
     if (counterMap["CONS-1"]) {
-      ["CG", "CME", "MG", "PED", "FIS", "TO", "TR"].forEach(code => {
-        if (serviceMap[code]) insertCounterService.run(counterMap["CONS-1"], serviceMap[code]);
-      });
-    }
-
-    // 4. Banners Oficiales Iniciales (SOLO si no existen previamente en la base de datos)
-    const bannerSetting = db.prepare("SELECT id FROM settings WHERE key = 'BANNERS_PUBLICIDAD' AND branch_id IS NULL").get();
-    if (!bannerSetting) {
-      const officialBanners = [
-        {
-          id: "b1",
-          title: "Clínica de Heridas & Cuidadoras",
-          subtitle: "Atención especializada en heridas y asistencia personalizada con calidez humana en casa.",
-          tag: "Atención Domiciliaria",
-          imageUrl: "/banners/banner_heridas_cuidadoras.png",
-          isActive: true
-        },
-        {
-          id: "b2",
-          title: "Pedagogía Infantil & Toma de Muestras",
-          subtitle: "Educación adaptada a tus hijos y laboratorio clínico en la comodidad de tu hogar.",
-          tag: "Salud y Educación",
-          imageUrl: "/banners/banner_pedagogia_muestras.png",
-          isActive: true
-        },
-        {
-          id: "b3",
-          title: "Psicología, Nutrición y Dietética",
-          subtitle: "Terapia emocional, manejo del estrés y planes alimenticios saludables para toda la familia.",
-          tag: "Bienestar Integral",
-          imageUrl: "/banners/banner_psicologia_nutricion.png",
-          isActive: true
-        },
-        {
-          id: "b4",
-          title: "Fonoaudiología & Fisioterapia",
-          subtitle: "Terapia del lenguaje, deglución y rehabilitación física integral en el hogar.",
-          tag: "Rehabilitación en Casa",
-          imageUrl: "/banners/banner_fono_fisioterapia.png",
-          isActive: true
-        },
-        {
-          id: "b5",
-          title: "Terapia Ocupacional & Terapia Respiratoria",
-          subtitle: "Desarrollo cognitivo y motor, junto a cuidado respiratorio especializado domiciliario.",
-          tag: "Terapia Especializada",
-          imageUrl: "/banners/banner_ocupacional_respiratoria.png",
-          isActive: true
+      for (const code of ["CG", "CME", "MG", "PED", "FIS", "TO", "TR"]) {
+        if (serviceMap[code]) {
+          await db.prepare("INSERT INTO counter_services (counter_id, service_id) VALUES (?, ?) ON CONFLICT DO NOTHING").run(counterMap["CONS-1"], serviceMap[code]);
         }
-      ];
-
-      db.prepare("INSERT INTO settings (branch_id, key, value, description, data_type) VALUES (NULL, 'BANNERS_PUBLICIDAD', ?, 'Banners multimedia rotativos en pantalla de TV', 'json')")
-        .run(JSON.stringify(officialBanners));
+      }
     }
 
     // 5. Sincronización Automática de Usuarios Oficiales (Admin Ing. Daniel Cárdenas Ruiz + 1 usuario por módulo)
     const passwordHash = bcrypt.hashSync('Home2026*', 10);
-    const officialUsernames = ['admin', 'Consultorio1', 'Ventanilla1', 'Ventanilla2', 'Entrevista1', 'Entrevista2'];
 
-    db.exec("UPDATE tickets SET user_id = 1 WHERE user_id IS NOT NULL AND user_id NOT IN (1,2,3,4,5,6);");
-    db.exec("UPDATE ticket_events SET user_id = 1 WHERE user_id IS NOT NULL AND user_id NOT IN (1,2,3,4,5,6);");
-    db.exec("UPDATE audit_logs SET user_id = 1 WHERE user_id IS NOT NULL AND user_id NOT IN (1,2,3,4,5,6);");
-
-    const userPlaceholders = officialUsernames.map(() => '?').join(',');
-    db.prepare(`DELETE FROM users WHERE username NOT IN (${userPlaceholders})`).run(...officialUsernames);
-
-    const existingAdmin = db.prepare("SELECT id FROM users WHERE username = 'admin'").get();
+    const existingAdmin = await db.prepare("SELECT id FROM users WHERE username = 'admin'").get();
     if (existingAdmin) {
-      db.prepare("UPDATE users SET full_name = 'Ing. Daniel Cárdenas Ruiz', role_id = 1, password_hash = ?, is_active = 1 WHERE id = ?")
+      await db.prepare("UPDATE users SET full_name = 'Ing. Daniel Cárdenas Ruiz', role_id = 1, password_hash = ?, is_active = 1 WHERE id = ?")
         .run(passwordHash, existingAdmin.id);
     } else {
-      db.prepare("INSERT INTO users (id, branch_id, role_id, username, email, password_hash, full_name, is_active) VALUES (1, 1, 1, 'admin', 'admin@homecare.com', ?, 'Ing. Daniel Cárdenas Ruiz', 1)")
+      await db.prepare("INSERT INTO users (id, branch_id, role_id, username, email, password_hash, full_name, is_active) VALUES (1, 1, 1, 'admin', 'admin@homecare.com', ?, 'Ing. Daniel Cárdenas Ruiz', 1)")
         .run(passwordHash);
     }
 
@@ -285,18 +235,18 @@ async function syncServicesAndCounters() {
     ];
 
     for (const m of moduleUserDefs) {
-      const existing = db.prepare("SELECT id FROM users WHERE username = ?").get(m.username);
+      const existing = await db.prepare("SELECT id FROM users WHERE username = ?").get(m.username);
       if (existing) {
-        db.prepare("UPDATE users SET full_name = ?, role_id = 3, password_hash = ?, is_active = 1 WHERE id = ?")
+        await db.prepare("UPDATE users SET full_name = ?, role_id = 3, password_hash = ?, is_active = 1 WHERE id = ?")
           .run(m.name, passwordHash, existing.id);
       } else {
-        db.prepare("INSERT INTO users (id, branch_id, role_id, username, email, password_hash, full_name, is_active) VALUES (?, 1, 3, ?, ?, ?, ?, 1)")
+        await db.prepare("INSERT INTO users (id, branch_id, role_id, username, email, password_hash, full_name, is_active) VALUES (?, 1, 3, ?, ?, ?, ?, 1)")
           .run(m.id, m.username, `${m.username.toLowerCase()}@homecare.com`, passwordHash, m.name);
       }
     }
 
     if (db.persistToDisk) db.persistToDisk();
-    console.log("Sincronización completa: Servicios, Módulos y Usuarios Oficiales (Admin Ing. Daniel Cárdenas Ruiz + 5 Módulos).");
+    console.log("✅ Sincronización completa: Servicios, Módulos y Usuarios Oficiales (Admin Ing. Daniel Cárdenas Ruiz + 5 Módulos).");
   } catch (err) {
     console.error("Error sincronizando servicios y modulos:", err);
   }

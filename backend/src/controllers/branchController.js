@@ -7,7 +7,7 @@ require('dotenv').config();
 class BranchController {
   static async getAll(req, res) {
     try {
-      const branches = db.prepare(`
+      const branches = await db.prepare(`
         SELECT b.*, c.name as company_name, c.logo_url, c.primary_color
         FROM branches b
         JOIN companies c ON b.company_id = c.id
@@ -41,7 +41,7 @@ class BranchController {
 
   static async getById(req, res) {
     try {
-      const branch = db.prepare(`
+      const branch = await db.prepare(`
         SELECT b.*, c.name as company_name, c.logo_url, c.primary_color, c.secondary_color
         FROM branches b
         JOIN companies c ON b.company_id = c.id
@@ -74,7 +74,7 @@ class BranchController {
     }
   }
 
-  static create(req, res) {
+  static async create(req, res) {
     try {
       const { company_id = 1, code, name, address, phone, business_hours, qr_code_slug } = req.body;
 
@@ -83,12 +83,12 @@ class BranchController {
       }
 
       const slug = qr_code_slug || code.toLowerCase().replace(/[^a-z0-9]/g, '-');
-      const result = db.prepare(`
+      const result = await db.prepare(`
         INSERT INTO branches (company_id, code, name, address, phone, business_hours, qr_code_slug, is_active)
         VALUES (?, ?, ?, ?, ?, ?, ?, 1)
       `).run(company_id, code.toUpperCase(), name, address, phone, business_hours, slug);
 
-      AuditService.log({
+      await AuditService.log({
         userId: req.user.id,
         action: 'CREATE_BRANCH',
         entity: 'BRANCH',
@@ -102,12 +102,12 @@ class BranchController {
     }
   }
 
-  static update(req, res) {
+  static async update(req, res) {
     try {
       const { id } = req.params;
       const { code, name, address, phone, business_hours, is_active } = req.body;
 
-      db.prepare(`
+      await db.prepare(`
         UPDATE branches
         SET code = COALESCE(?, code),
             name = COALESCE(?, name),
@@ -119,7 +119,7 @@ class BranchController {
         WHERE id = ?
       `).run(code ? code.toUpperCase() : null, name, address, phone, business_hours, is_active !== undefined ? (is_active ? 1 : 0) : null, id);
 
-      AuditService.log({
+      await AuditService.log({
         userId: req.user.id,
         action: 'UPDATE_BRANCH',
         entity: 'BRANCH',
@@ -133,24 +133,24 @@ class BranchController {
     }
   }
 
-  static delete(req, res) {
+  static async delete(req, res) {
     try {
       const { id } = req.params;
-      const existing = db.prepare('SELECT * FROM branches WHERE id = ?').get(id);
+      const existing = await db.prepare('SELECT * FROM branches WHERE id = ?').get(id);
       if (!existing) return res.status(404).json({ success: false, error: 'SEDE_NO_ENCONTRADA' });
 
-      const countRow = db.prepare('SELECT COUNT(*) as total FROM branches').get();
+      const countRow = await db.prepare('SELECT COUNT(*) as total FROM branches').get();
       if (countRow && countRow.total <= 1) {
         return res.status(400).json({ success: false, error: 'NO_SE_PUEDE_ELIMINAR_UNICA_SEDE', message: 'Debe existir al menos una sede principal en el sistema.' });
       }
 
-      const transaction = db.transaction(() => {
-        db.prepare('DELETE FROM counters WHERE branch_id = ?').run(id);
-        db.prepare('DELETE FROM branches WHERE id = ?').run(id);
+      const transaction = db.transaction(async () => {
+        await db.prepare('DELETE FROM counters WHERE branch_id = ?').run(id);
+        await db.prepare('DELETE FROM branches WHERE id = ?').run(id);
       });
-      transaction();
+      await transaction();
 
-      AuditService.log({
+      await AuditService.log({
         userId: req.user ? req.user.id : null,
         action: 'DELETE_BRANCH',
         entity: 'BRANCH',

@@ -6,14 +6,14 @@ class TicketController {
   /**
    * Consulta si una cédula/documento ya existe en el sistema
    */
-  static checkPatient(req, res) {
+  static async checkPatient(req, res) {
     try {
       const { documentNumber } = req.params;
       if (!documentNumber) {
         return res.status(400).json({ success: false, error: 'DOCUMENTO_REQUERIDO' });
       }
 
-      const patient = db.prepare(`
+      const patient = await db.prepare(`
         SELECT id, document_number, full_name, age, phone, is_priority_auto
         FROM patients 
         WHERE document_number = ?
@@ -48,7 +48,7 @@ class TicketController {
   /**
    * Solicitar un nuevo turno desde el celular / QR
    */
-  static requestTicket(req, res) {
+  static async requestTicket(req, res) {
     try {
       const { branchId = 1, serviceId, patientData, appointmentTime = null, targetCounterId = null } = req.body;
 
@@ -61,7 +61,7 @@ class TicketController {
       }
 
       const ipAddress = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
-      const result = TicketService.createTicket({
+      const result = await TicketService.createTicket({
         branchId: Number(branchId),
         serviceId: Number(serviceId),
         patientData,
@@ -97,10 +97,10 @@ class TicketController {
   /**
    * Obtiene la información para la Pantalla Pública TV
    */
-  static getPublicDisplay(req, res) {
+  static async getPublicDisplay(req, res) {
     try {
       const branchId = Number(req.params.branchId || 1);
-      const data = TicketService.getPublicDisplayData(branchId);
+      const data = await TicketService.getPublicDisplayData(branchId);
       res.json({ success: true, ...data });
     } catch (err) {
       res.status(500).json({ success: false, error: 'SERVER_ERROR', message: err.message });
@@ -110,11 +110,11 @@ class TicketController {
   /**
    * Obtiene la cola de espera activa para el funcionario
    */
-  static getWaitingQueue(req, res) {
+  static async getWaitingQueue(req, res) {
     try {
       const branchId = Number(req.params.branchId || (req.user ? req.user.branch_id : 1) || 1);
       const counterId = req.query.counterId ? Number(req.query.counterId) : null;
-      const data = TicketService.getWaitingQueue(branchId, counterId);
+      const data = await TicketService.getWaitingQueue(branchId, counterId);
       res.json({ success: true, ...data });
     } catch (err) {
       res.status(500).json({ success: false, error: 'SERVER_ERROR', message: err.message });
@@ -124,7 +124,7 @@ class TicketController {
   /**
    * Llamar al siguiente turno recomendado o uno específico
    */
-  static callNext(req, res) {
+  static async callNext(req, res) {
     try {
       const { counterId, branchId, specificTicketId } = req.body;
       const userId = req.user.id;
@@ -134,7 +134,7 @@ class TicketController {
         return res.status(400).json({ success: false, error: 'MODULO_REQUERIDO', message: 'Debe seleccionar un módulo o consultorio' });
       }
 
-      const calledTicket = TicketService.callNextTicket({
+      const calledTicket = await TicketService.callNextTicket({
         counterId: Number(counterId),
         userId,
         branchId: activeBranchId,
@@ -166,13 +166,13 @@ class TicketController {
   /**
    * Re-llamar el turno actual
    */
-  static recall(req, res) {
+  static async recall(req, res) {
     try {
       const ticketId = Number(req.params.id);
       const userId = req.user.id;
 
-      const ticket = TicketService.recallTicket(ticketId, userId);
-      const fullTicket = db.prepare(`
+      const ticket = await TicketService.recallTicket(ticketId, userId);
+      const fullTicket = await db.prepare(`
         SELECT t.*, s.name as service_name, s.code as service_code,
                c.name as counter_name, c.code as counter_code
         FROM tickets t
@@ -192,12 +192,12 @@ class TicketController {
   /**
    * Iniciar atención
    */
-  static startAttention(req, res) {
+  static async startAttention(req, res) {
     try {
       const ticketId = Number(req.params.id);
       const userId = req.user.id;
 
-      const ticket = TicketService.startAttention(ticketId, userId);
+      const ticket = await TicketService.startAttention(ticketId, userId);
       socketHandler.emitTicketStatusChanged(ticket.branch_id, ticket);
 
       res.json({ success: true, ticket });
@@ -209,13 +209,13 @@ class TicketController {
   /**
    * Finalizar atención
    */
-  static complete(req, res) {
+  static async complete(req, res) {
     try {
       const ticketId = Number(req.params.id);
       const { notes } = req.body;
       const userId = req.user.id;
 
-      const ticket = TicketService.completeTicket(ticketId, userId, notes);
+      const ticket = await TicketService.completeTicket(ticketId, userId, notes);
       socketHandler.emitTicketStatusChanged(ticket.branch_id, ticket);
 
       res.json({ success: true, ticket });
@@ -227,12 +227,12 @@ class TicketController {
   /**
    * Marcar como No Se Presentó
    */
-  static markNoShow(req, res) {
+  static async markNoShow(req, res) {
     try {
       const ticketId = Number(req.params.id);
       const userId = req.user.id;
 
-      const ticket = TicketService.markNoShow(ticketId, userId);
+      const ticket = await TicketService.markNoShow(ticketId, userId);
       socketHandler.emitTicketStatusChanged(ticket.branch_id, ticket);
 
       res.json({ success: true, ticket });
@@ -244,13 +244,13 @@ class TicketController {
   /**
    * Derivar / Transferir turno a consultorio u otro servicio
    */
-  static transfer(req, res) {
+  static async transfer(req, res) {
     try {
       const ticketId = Number(req.params.id);
       const { targetServiceId, targetCounterId, notes, fromCounterId } = req.body;
       const userId = req.user.id;
 
-      const ticket = TicketService.transferTicket({
+      const ticket = await TicketService.transferTicket({
         ticketId,
         targetServiceId: targetServiceId ? Number(targetServiceId) : null,
         targetCounterId: targetCounterId ? Number(targetCounterId) : null,
@@ -276,12 +276,12 @@ class TicketController {
   /**
    * Pausar turno
    */
-  static pause(req, res) {
+  static async pause(req, res) {
     try {
       const ticketId = Number(req.params.id);
       const userId = req.user.id;
 
-      const ticket = TicketService.pauseTicket(ticketId, userId);
+      const ticket = await TicketService.pauseTicket(ticketId, userId);
       socketHandler.emitTicketStatusChanged(ticket.branch_id, ticket);
 
       res.json({ success: true, ticket });
@@ -293,10 +293,10 @@ class TicketController {
   /**
    * Seguimiento en vivo desde el celular
    */
-  static trackTicket(req, res) {
+  static async trackTicket(req, res) {
     try {
       const ticketId = Number(req.params.id);
-      const data = TicketService.getTicketTracking(ticketId);
+      const data = await TicketService.getTicketTracking(ticketId);
       res.json({ success: true, ...data });
     } catch (err) {
       res.status(404).json({ success: false, error: err.message });
@@ -306,12 +306,12 @@ class TicketController {
   /**
    * Obtiene datos de la programación de turnos (agenda, métricas, módulo workload)
    */
-  static getSchedule(req, res) {
+  static async getSchedule(req, res) {
     try {
       const branchId = Number(req.query.branchId || (req.user ? req.user.branch_id : 1) || 1);
       const { startDate, endDate, date, serviceId, counterId, userId, status, search } = req.query;
 
-      const data = TicketService.getScheduleData({
+      const data = await TicketService.getScheduleData({
         branchId,
         startDate,
         endDate,
@@ -333,7 +333,7 @@ class TicketController {
   /**
    * Crear un turno programado para fecha futura u hoy
    */
-  static createSchedule(req, res) {
+  static async createSchedule(req, res) {
     try {
       const {
         branchId = 1,
@@ -356,7 +356,7 @@ class TicketController {
       }
 
       const createdByUserId = req.user ? req.user.id : null;
-      const result = TicketService.createScheduledTicket({
+      const result = await TicketService.createScheduledTicket({
         branchId: Number(branchId),
         scheduledDate,
         appointmentTime,
@@ -386,7 +386,7 @@ class TicketController {
   /**
    * Editar directamente un turno que NO ha sido llamado
    */
-  static editUncalled(req, res) {
+  static async editUncalled(req, res) {
     try {
       const ticketId = Number(req.params.id);
       const {
@@ -402,7 +402,7 @@ class TicketController {
 
       const modifiedByUserId = req.user ? req.user.id : null;
 
-      const ticket = TicketService.editUncalledTicket({
+      const ticket = await TicketService.editUncalledTicket({
         ticketId,
         patientData,
         serviceId,
@@ -432,13 +432,13 @@ class TicketController {
   /**
    * Cancelar directamente un turno que NO ha sido llamado
    */
-  static cancelUncalled(req, res) {
+  static async cancelUncalled(req, res) {
     try {
       const ticketId = Number(req.params.id);
       const { reason } = req.body;
       const cancelledByUserId = req.user ? req.user.id : null;
 
-      const result = TicketService.cancelUncalledTicket({
+      const result = await TicketService.cancelUncalledTicket({
         ticketId,
         reason,
         cancelledByUserId

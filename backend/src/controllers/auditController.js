@@ -1,10 +1,10 @@
 const AuditService = require('../services/auditService');
 
 class AuditController {
-  static getLogs(req, res) {
+  static async getLogs(req, res) {
     try {
       const { limit = 100, offset = 0, action, entity, startDate, endDate } = req.query;
-      const logs = AuditService.getLogs({
+      const logs = await AuditService.getLogs({
         limit: Number(limit),
         offset: Number(offset),
         action,
