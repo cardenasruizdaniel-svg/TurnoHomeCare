@@ -1130,28 +1130,28 @@ class TicketService {
       params.push(startDate, endDate);
     }
 
-    if (serviceId) {
+    if (serviceId && serviceId !== 'undefined' && serviceId !== 'null' && !isNaN(Number(serviceId)) && Number(serviceId) > 0) {
       conditions.push('t.service_id = ?');
       params.push(Number(serviceId));
     }
 
-    if (counterId) {
+    if (counterId && counterId !== 'undefined' && counterId !== 'null' && !isNaN(Number(counterId)) && Number(counterId) > 0) {
       conditions.push('t.counter_id = ?');
       params.push(Number(counterId));
     }
 
-    if (userId) {
+    if (userId && userId !== 'undefined' && userId !== 'null' && !isNaN(Number(userId)) && Number(userId) > 0) {
       conditions.push('t.user_id = ?');
       params.push(Number(userId));
     }
 
-    if (status) {
+    if (status && status !== 'undefined' && status !== 'null' && String(status).trim() !== '') {
       conditions.push('t.status = ?');
-      params.push(status);
+      params.push(String(status).trim());
     }
 
-    if (search && search.trim()) {
-      const term = `%${search.trim()}%`;
+    if (search && search !== 'undefined' && search !== 'null' && String(search).trim() !== '') {
+      const term = `%${String(search).trim()}%`;
       conditions.push('(p.full_name LIKE ? OR p.document_number LIKE ? OR t.ticket_number LIKE ?)');
       params.push(term, term, term);
     }

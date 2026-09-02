@@ -1,102 +1,92 @@
 const API_BASE = '/api';
 
+function buildQueryString(params = {}) {
+  const cleanParams = {};
+  for (const [key, val] of Object.entries(params)) {
+    if (val !== undefined && val !== null && val !== '' && val !== 'undefined' && val !== 'null') {
+      cleanParams[key] = val;
+    }
+  }
+  const qs = new URLSearchParams(cleanParams).toString();
+  return qs ? `?${qs}` : '';
+}
+
 async function request(endpoint, options = {}) {
   const token = localStorage.getItem('deaturnos_token');
   const headers = {
     'Content-Type': 'application/json',
-    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-    ...(options.headers || {})
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...options.headers
   };
 
-  const response = await fetch(`${API_BASE}${endpoint}`, {
+  const config = {
     ...options,
     headers
-  });
+  };
 
-  if (response.status === 401 && !endpoint.includes('/auth/login')) {
-    localStorage.removeItem('deaturnos_token');
-    localStorage.removeItem('deaturnos_user');
-    if (window.location.pathname.startsWith('/admin') || window.location.pathname.startsWith('/atencion')) {
-      window.location.href = '/login';
-    }
-  }
-
+  const response = await fetch(`${API_BASE}${endpoint}`, config);
   const data = await response.json();
+
   if (!response.ok) {
-    throw new Error(data.message || data.error || 'Error en la petición al servidor');
+    throw new Error(data.error || data.message || 'Error en la petición al servidor');
   }
+
   return data;
 }
 
 export const api = {
-  // Auth
-  login: (username, password) => request('/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
+  // Autenticación
+  login: (credentials) => request('/auth/login', { method: 'POST', body: JSON.stringify(credentials) }),
   getMe: () => request('/auth/me'),
 
-  // Public / Mobile / QR
-  checkPatient: (documentNumber) => request(`/patients/check/${encodeURIComponent(documentNumber)}`),
-  requestTicket: (payload) => request('/tickets/request', { method: 'POST', body: JSON.stringify(payload) }),
-  trackTicket: (ticketId) => request(`/tickets/track/${ticketId}`),
-  getPublicDisplay: (branchId = 1) => request(`/tickets/public-display/${branchId}`),
-  getPublicBranches: () => request('/branches/public'),
-  getPublicBranch: (id) => request(`/branches/${id}/public`),
-  getPublicServices: () => request('/services/public'),
-  getPublicCounters: () => request('/counters/public'),
-  getPublicSettings: () => request('/settings/public'),
+  // Datos Institucionales
+  getCompany: () => request('/company'),
+  getBranches: () => request('/branches'),
 
-  // Funcionario / Atención
-  getWaitingQueue: (branchId, counterId) => request(`/tickets/queue/${branchId || ''}${counterId ? `?counterId=${counterId}` : ''}`),
-  callNextTicket: (payload) => request('/tickets/call-next', { method: 'POST', body: JSON.stringify(payload) }),
-  recallTicket: (id) => request(`/tickets/${id}/recall`, { method: 'POST' }),
-  startAttention: (id) => request(`/tickets/${id}/start-attention`, { method: 'POST' }),
-  completeTicket: (id, notes) => request(`/tickets/${id}/complete`, { method: 'POST', body: JSON.stringify({ notes }) }),
-  transferTicket: (id, payload) => request(`/tickets/${id}/transfer`, { method: 'POST', body: JSON.stringify(payload) }),
-  markNoShow: (id) => request(`/tickets/${id}/no-show`, { method: 'POST' }),
-  pauseTicket: (id) => request(`/tickets/${id}/pause`, { method: 'POST' }),
-
-  // Administración
-  getDashboardStats: (branchId, date) => request(`/stats/dashboard?${new URLSearchParams({ ...(branchId ? { branchId } : {}), ...(date ? { date } : {}) }).toString()}`),
-  getTicketHistory: (params) => request(`/stats/history?${new URLSearchParams(params || {}).toString()}`),
-  getExportCSVUrl: (params) => `${API_BASE}/stats/export-csv?${new URLSearchParams(params || {}).toString()}`,
-
-  // CRUD Servicios
-  getServices: (all = true) => request(`/services?all=${all}`),
+  // Servicios Médicos
+  getServices: () => request('/services'),
   createService: (data) => request('/services', { method: 'POST', body: JSON.stringify(data) }),
   updateService: (id, data) => request(`/services/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  toggleServiceActive: (id) => request(`/services/${id}/toggle`, { method: 'PATCH' }),
   deleteService: (id) => request(`/services/${id}`, { method: 'DELETE' }),
 
-  // CRUD Módulos
-  getCounters: (branchId) => request(`/counters${branchId ? `?branchId=${branchId}` : ''}`),
+  // Módulos / Consultorios
+  getCounters: () => request('/counters'),
   createCounter: (data) => request('/counters', { method: 'POST', body: JSON.stringify(data) }),
   updateCounter: (id, data) => request(`/counters/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteCounter: (id) => request(`/counters/${id}`, { method: 'DELETE' }),
 
-  // CRUD Sedes
-  getBranches: () => request('/branches'),
-  getBranch: (id) => request(`/branches/${id}`),
-  createBranch: (data) => request('/branches', { method: 'POST', body: JSON.stringify(data) }),
-  updateBranch: (id, data) => request(`/branches/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  deleteBranch: (id) => request(`/branches/${id}`, { method: 'DELETE' }),
-
-  // CRUD Usuarios y Roles
+  // Usuarios / Funcionarios
   getUsers: () => request('/users'),
-  getRoles: () => request('/roles'),
   createUser: (data) => request('/users', { method: 'POST', body: JSON.stringify(data) }),
   updateUser: (id, data) => request(`/users/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  toggleUserActive: (id) => request(`/users/${id}/toggle`, { method: 'PATCH' }),
   deleteUser: (id) => request(`/users/${id}`, { method: 'DELETE' }),
-  checkUserMovements: (id) => request(`/users/${id}/movements`),
 
-  // Configuración y Copias de Seguridad
-  getSettings: () => request('/settings'),
-  updateSettings: (payload) => request('/settings', { method: 'POST', body: JSON.stringify(payload) }),
-  resetDailyQueue: (branchId) => request('/settings/reset-daily-queue', { method: 'POST', body: JSON.stringify({ branchId }) }),
-  getBackupDownloadUrl: () => `${API_BASE}/settings/backup/download`,
-  getBackupExportJsonUrl: () => `${API_BASE}/settings/backup/export-json`,
-  exportJsonBackup: () => request('/settings/backup/export-json'),
-  importJsonBackup: (backupData) => request('/settings/backup/import-json', { method: 'POST', body: JSON.stringify({ backupData }) }),
-  createBackupSnapshot: () => request('/settings/backup/create', { method: 'POST' }),
+  // Pacientes
+  checkPatient: (documentNumber) => request(`/tickets/patient-check/${documentNumber}`),
+
+  // Turnos Operativos
+  requestTicket: (ticketData) => request('/tickets/request', { method: 'POST', body: JSON.stringify(ticketData) }),
+  callNextTicket: (data) => request('/tickets/call-next', { method: 'POST', body: JSON.stringify(data) }),
+  callSpecificTicket: (data) => request('/tickets/call-specific', { method: 'POST', body: JSON.stringify(data) }),
+  startAttention: (data) => request('/tickets/start-attention', { method: 'POST', body: JSON.stringify(data) }),
+  completeTicket: (data) => request('/tickets/complete', { method: 'POST', body: JSON.stringify(data) }),
+  markNoShow: (data) => request('/tickets/no-show', { method: 'POST', body: JSON.stringify(data) }),
+  transferTicket: (data) => request('/tickets/transfer', { method: 'POST', body: JSON.stringify(data) }),
+  pauseTicket: (data) => request('/tickets/pause', { method: 'POST', body: JSON.stringify(data) }),
+  recallTicket: (data) => request('/tickets/recall', { method: 'POST', body: JSON.stringify(data) }),
+
+  // Colas y Pantalla Pública
+  getWaitingQueue: (branchId, counterId) => request(`/tickets/queue/${branchId}${counterId ? `?counterId=${counterId}` : ''}`),
+  getPublicDisplay: (branchId) => request(`/tickets/public-display/${branchId}`),
+
+  // Estadísticas y Reportes
+  getDashboardStats: (branchId, date) => request(`/stats/dashboard${buildQueryString({ branchId, date })}`),
+  getTicketHistory: (params) => request(`/stats/tickets${buildQueryString(params)}`),
+
+  // Configuraciones
+  getSettings: (branchId) => request(`/settings${branchId ? `?branchId=${branchId}` : ''}`),
+  updateSetting: (data) => request('/settings', { method: 'PUT', body: JSON.stringify(data) }),
+  updateSettingsBatch: (data) => request('/settings/batch', { method: 'PUT', body: JSON.stringify(data) }),
 
   // Túnel de Acceso Público (4G/5G)
   getTunnelStatus: () => request('/tunnel/status'),
@@ -104,11 +94,11 @@ export const api = {
   stopTunnel: () => request('/tunnel/stop', { method: 'POST' }),
 
   // Auditoría
-  getAuditLogs: (params) => request(`/audit?${new URLSearchParams(params || {}).toString()}`),
+  getAuditLogs: (params) => request(`/audit${buildQueryString(params)}`),
   syncOfficialData: () => request('/settings/sync-official-data', { method: 'POST' }),
 
   // Programación de Turnos y Edición/Cancelación Directa
-  getSchedule: (params) => request(`/schedule?${new URLSearchParams(params || {}).toString()}`),
+  getSchedule: (params) => request(`/schedule${buildQueryString(params)}`),
   createSchedule: (payload) => request('/schedule', { method: 'POST', body: JSON.stringify(payload) }),
   editUncalledTicket: (id, payload) => request(`/tickets/${id}/edit-uncalled`, { method: 'PUT', body: JSON.stringify(payload) }),
   cancelUncalledTicket: (id, reason) => request(`/tickets/${id}/cancel-uncalled`, { method: 'POST', body: JSON.stringify({ reason }) })

@@ -99,14 +99,14 @@ export function AdminScheduleView() {
   const loadScheduleData = async () => {
     try {
       setLoading(true);
-      const res = await api.getSchedule({
-        date: selectedDate,
-        serviceId: serviceFilter || undefined,
-        counterId: counterFilter || undefined,
-        userId: staffFilter || undefined,
-        status: statusFilter || undefined,
-        search: searchQuery || undefined
-      });
+      const queryParams = { date: selectedDate };
+      if (serviceFilter) queryParams.serviceId = serviceFilter;
+      if (counterFilter) queryParams.counterId = counterFilter;
+      if (staffFilter) queryParams.userId = staffFilter;
+      if (statusFilter) queryParams.status = statusFilter;
+      if (searchQuery && searchQuery.trim()) queryParams.search = searchQuery.trim();
+
+      const res = await api.getSchedule(queryParams);
 
       if (res.success) {
         setTickets(res.tickets || []);
