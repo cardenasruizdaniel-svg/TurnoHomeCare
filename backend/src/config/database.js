@@ -74,6 +74,27 @@ function normalizeSqlForPostgres(sql) {
   return pgSql;
 }
 
+function parsePostgresUrl(urlStr) {
+  try {
+    const parsed = new URL(urlStr);
+    return {
+      user: decodeURIComponent(parsed.username || 'postgres'),
+      password: decodeURIComponent(parsed.password || ''),
+      host: parsed.hostname || 'localhost',
+      port: parsed.port ? Number(parsed.port) : 5432,
+      database: parsed.pathname ? parsed.pathname.replace(/^\//, '') : 'deaturnos'
+    };
+  } catch (e) {
+    return {
+      user: 'postgres',
+      password: '',
+      host: 'localhost',
+      port: 5432,
+      database: 'deaturnos'
+    };
+  }
+}
+
 let initialized = false;
 
 async function initDb() {
@@ -82,19 +103,19 @@ async function initDb() {
   if (usePostgres) {
     const pgUrl = process.env.DATABASE_URL || '';
     const isProduction = process.env.NODE_ENV === 'production' || pgUrl.includes('render.com') || pgUrl.includes('ssl=true');
+    const parsed = parsePostgresUrl(pgUrl);
 
     const poolConfig = {
-      connectionString: pgUrl,
+      user: parsed.user,
+      password: parsed.password,
+      host: parsed.host,
+      port: parsed.port,
+      database: parsed.database,
       ssl: isProduction ? { rejectUnauthorized: false } : (pgUrl.includes('sslmode=require') ? { rejectUnauthorized: false } : false),
       max: 20,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 10000
     };
-
-    // Si la URL de Postgres no especifica password explícito (ej. postgres://postgres@localhost), forzar password a "" para evitar error SASL SCRAM
-    if (pgUrl && !/postgres:[^@]+@/.test(pgUrl) && !pgUrl.includes('render.com')) {
-      poolConfig.password = '';
-    }
 
     pgPool = new Pool(poolConfig);
 
@@ -103,9 +124,17 @@ async function initDb() {
     });
 
     // Probar conexión inicial
-    const client = await pgPool.connect();
-    client.release();
-    console.log('🐘 Conectado exitosamente a PostgreSQL.');
+    try {
+      const client = await pgPool.connect();
+      client.release();
+      console.log('🐘 Conectado exitosamente a PostgreSQL.');
+    } catch (connErr) {
+      console.error('\n❌ ERROR DE CONEXIÓN A POSTGRESQL:');
+      console.error(` Mensaje: ${connErr.message}`);
+      console.error(` Usuario: ${parsed.user} | Host: ${parsed.host}:${parsed.port} | BD: ${parsed.database}`);
+      console.error(' Por favor verifique la contraseña o estado de PostgreSQL en backend/.env\n');
+      throw connErr;
+    }
   } else {
     SQL = await initSqlJs();
     const fullPath = path.resolve(dbPath);
