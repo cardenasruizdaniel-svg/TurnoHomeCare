@@ -35,7 +35,7 @@ if not exist .env (
 (
 echo PORT=5000
 echo NODE_ENV=development
-echo DATABASE_URL=postgres://postgres:@localhost:5432/deaturnos
+echo DATABASE_URL=postgres://postgres:admin123@localhost:5432/deaturnos
 echo JWT_SECRET=deaturnos_super_secret_jwt_key_homecare_2026
 echo ENABLE_TUNNEL=false
 ) > .env

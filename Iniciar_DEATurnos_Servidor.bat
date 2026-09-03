@@ -17,7 +17,7 @@ cd /d "%ROOT_DIR%\backend"
 if not exist .env (
     echo PORT=5000 > .env
     echo NODE_ENV=development >> .env
-    echo DATABASE_URL=postgres://postgres:@localhost:5432/deaturnos >> .env
+    echo DATABASE_URL=postgres://postgres:admin123@localhost:5432/deaturnos >> .env
     echo JWT_SECRET=deaturnos_super_secret_jwt_key_homecare_2026 >> .env
     echo ENABLE_TUNNEL=false >> .env
 )

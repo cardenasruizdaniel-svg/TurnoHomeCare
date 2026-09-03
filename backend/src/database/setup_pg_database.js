@@ -19,6 +19,7 @@ async function setupPgDatabase() {
   const candidatePasswords = [
     urlPassword,
     process.env.PGPASSWORD,
+    'admin123',
     'postgres',
     '',
     'admin',
