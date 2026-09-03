@@ -31,6 +31,7 @@ echo [OK] Node.js detectado correctamente.
 echo.
 echo [PASO 1/5] Configurando variables de entorno de la aplicacion...
 cd /d "%ROOT_DIR%\backend"
+if not exist .env (
 (
 echo PORT=5000
 echo NODE_ENV=development
@@ -38,8 +39,9 @@ echo DATABASE_URL=postgres://postgres@localhost:5432/deaturnos
 echo JWT_SECRET=deaturnos_super_secret_jwt_key_homecare_2026
 echo ENABLE_TUNNEL=false
 ) > .env
+)
 
-echo [OK] Archivo .env generado dinamicamente para %ROOT_DIR%.
+echo [OK] Archivo .env verificado dinamicamente para %ROOT_DIR%.
 
 :: 4. INSTALAR DEPENDENCIAS NPM (BACKEND Y FRONTEND)
 echo.
@@ -52,23 +54,11 @@ call npm install --no-audit --no-fund >nul 2>&1
 
 echo [OK] Dependencias instaladas.
 
-:: 5. INICIALIZAR Y MIGRAR BASE DE DATOS POSTGRESQL LOCAL
+:: 5. INICIALIZAR Y MIGRAR BASE DE DATOS POSTGRESQL LOCAL DE FORMA AUTOMÁTICA Y SIN BLOQUEOS
 echo.
 echo [PASO 3/5] Creando y migrando base de datos PostgreSQL local...
-
-:: Intentar crear la base de datos deaturnos en PostgreSQL si psql esta presente
-where psql >nul 2>&1
-if %errorlevel% equ 0 (
-    psql -U postgres -c "CREATE DATABASE deaturnos;" >nul 2>&1
-) else if exist "C:\pgsql16\pgsql\bin\psql.exe" (
-    "C:\pgsql16\pgsql\bin\psql.exe" -U postgres -c "CREATE DATABASE deaturnos;" >nul 2>&1
-) else if exist "C:\Program Files\PostgreSQL\16\bin\psql.exe" (
-    "C:\Program Files\PostgreSQL\16\bin\psql.exe" -U postgres -c "CREATE DATABASE deaturnos;" >nul 2>&1
-) else if exist "C:\Program Files\PostgreSQL\15\bin\psql.exe" (
-    "C:\Program Files\PostgreSQL\15\bin\psql.exe" -U postgres -c "CREATE DATABASE deaturnos;" >nul 2>&1
-)
-
 cd /d "%ROOT_DIR%\backend"
+node src/database/setup_pg_database.js
 node src/database/init.js
 node src/database/migrate_sqlite_to_pg.js
 node src/database/syncServicesAndCounters.js
