@@ -123,17 +123,29 @@ async function initDb() {
       console.error('[PostgreSQL Pool Error]:', err.message);
     });
 
-    // Probar conexión inicial
     try {
       const client = await pgPool.connect();
       client.release();
       console.log('🐘 Conectado exitosamente a PostgreSQL.');
     } catch (connErr) {
-      console.error('\n❌ ERROR DE CONEXIÓN A POSTGRESQL:');
-      console.error(` Mensaje: ${connErr.message}`);
-      console.error(` Usuario: ${parsed.user} | Host: ${parsed.host}:${parsed.port} | BD: ${parsed.database}`);
-      console.error(' Por favor verifique la contraseña o estado de PostgreSQL en backend/.env\n');
-      throw connErr;
+      console.error('\n⚠️  [POSTGRESQL]: No se pudo conectar a la base de datos PostgreSQL local.');
+      console.error(` Error: ${connErr.message}`);
+      console.error(' 💡 Si su PostgreSQL exige clave personalizada, ejecute "configurar_clave_postgres.bat"');
+      console.error(' 🚀 Activando modo de contingencia SQLite para garantizar el funcionamiento inmediato del sistema sin caídas.\n');
+      
+      usePostgres = false;
+      pgPool = null;
+
+      SQL = await initSqlJs();
+      const fullPath = path.resolve(dbPath);
+      if (fs.existsSync(fullPath)) {
+        const filebuffer = fs.readFileSync(fullPath);
+        rawDb = new SQL.Database(filebuffer);
+      } else {
+        rawDb = new SQL.Database();
+        persistToDisk();
+      }
+      console.log('📂 Sistema iniciado exitosamente en modo contingencia SQLite local.');
     }
   } else {
     SQL = await initSqlJs();

@@ -9,7 +9,7 @@ async function setupPgDatabase() {
   const envPath = path.join(__dirname, '../../.env');
 
   // Extraer contraseña actual de DATABASE_URL si existe
-  let currentUrl = process.env.DATABASE_URL || 'postgres://postgres@localhost:5432/deaturnos';
+  let currentUrl = process.env.DATABASE_URL || 'postgres://postgres:@localhost:5432/deaturnos';
   let urlPassword = '';
   try {
     const match = currentUrl.match(/postgres:\/\/postgres:([^@]+)@/);
@@ -25,7 +25,15 @@ async function setupPgDatabase() {
     '123456',
     '1234',
     'root',
-    'Home2026*'
+    'Home2026*',
+    '12345',
+    'password',
+    '12345678',
+    '123',
+    'sql',
+    'master',
+    'manager',
+    'deaturnos'
   ].filter(p => p !== undefined && p !== null);
 
   // Eliminar duplicados manteniendo orden
@@ -55,7 +63,7 @@ async function setupPgDatabase() {
   }
 
   if (!connectedClient) {
-    console.warn('⚠️  No se pudo autoconectar con contraseñas por defecto. Se continuará con la configuración estándar.');
+    console.warn('⚠️  No se pudo autoconectar con contraseñas por defecto. Si su PostgreSQL requiere clave personalizada, ejecute configurar_clave_postgres.bat');
     return;
   }
 
