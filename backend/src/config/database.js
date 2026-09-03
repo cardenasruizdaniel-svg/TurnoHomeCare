@@ -57,11 +57,9 @@ function convertPlaceholders(sql) {
 function normalizeSqlForPostgres(sql) {
   let pgSql = convertPlaceholders(sql);
   
-  // Reemplazar date(t.created_at, 'localtime') o date(col) por DATE(col)
   pgSql = pgSql.replace(/date\(([^,\)]+),\s*'localtime'\)/gi, 'DATE($1)');
   pgSql = pgSql.replace(/datetime\('now'\)/gi, 'CURRENT_TIMESTAMP');
   
-  // Reemplazar INSERT OR IGNORE por INSERT ... ON CONFLICT DO NOTHING
   if (/INSERT\s+OR\s+IGNORE\s+INTO\s+(\w+)/i.test(pgSql)) {
     pgSql = pgSql.replace(/INSERT\s+OR\s+IGNORE\s+INTO/i, 'INSERT INTO');
     if (!pgSql.includes('ON CONFLICT')) {
@@ -69,7 +67,6 @@ function normalizeSqlForPostgres(sql) {
     }
   }
 
-  // Reemplazar INSERT OR REPLACE por INSERT ... ON CONFLICT
   if (/INSERT\s+OR\s+REPLACE\s+INTO\s+(\w+)/i.test(pgSql)) {
     pgSql = pgSql.replace(/INSERT\s+OR\s+REPLACE\s+INTO/i, 'INSERT INTO');
   }
@@ -83,14 +80,23 @@ async function initDb() {
   if (initialized) return;
 
   if (usePostgres) {
-    const isProduction = process.env.NODE_ENV === 'production' || process.env.DATABASE_URL.includes('render.com') || process.env.DATABASE_URL.includes('ssl=true');
-    pgPool = new Pool({
-      connectionString: process.env.DATABASE_URL,
-      ssl: isProduction ? { rejectUnauthorized: false } : (process.env.DATABASE_URL.includes('sslmode=require') ? { rejectUnauthorized: false } : false),
+    const pgUrl = process.env.DATABASE_URL || '';
+    const isProduction = process.env.NODE_ENV === 'production' || pgUrl.includes('render.com') || pgUrl.includes('ssl=true');
+
+    const poolConfig = {
+      connectionString: pgUrl,
+      ssl: isProduction ? { rejectUnauthorized: false } : (pgUrl.includes('sslmode=require') ? { rejectUnauthorized: false } : false),
       max: 20,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 10000
-    });
+    };
+
+    // Si la URL de Postgres no especifica password explícito (ej. postgres://postgres@localhost), forzar password a "" para evitar error SASL SCRAM
+    if (pgUrl && !/postgres:[^@]+@/.test(pgUrl) && !pgUrl.includes('render.com')) {
+      poolConfig.password = '';
+    }
+
+    pgPool = new Pool(poolConfig);
 
     pgPool.on('error', (err) => {
       console.error('[PostgreSQL Pool Error]:', err.message);
@@ -133,7 +139,6 @@ const dbWrapper = {
     if (usePostgres) {
       if (!pgPool) throw new Error('PostgreSQL Pool no inicializado');
       const pgSql = normalizeSqlForPostgres(sql);
-      // Retornar promesa para compatibilidad asíncrona
       return pgPool.query(pgSql);
     } else {
       if (!rawDb) throw new Error('DB SQLite no inicializada');
@@ -154,7 +159,6 @@ const dbWrapper = {
 
   prepare(sql) {
     return {
-      // Método .get(...params)
       get(...params) {
         const flatParams = params.length === 1 && Array.isArray(params[0]) ? params[0] : params;
 
@@ -175,7 +179,6 @@ const dbWrapper = {
         }
       },
 
-      // Método .all(...params)
       all(...params) {
         const flatParams = params.length === 1 && Array.isArray(params[0]) ? params[0] : params;
 
@@ -199,7 +202,6 @@ const dbWrapper = {
         }
       },
 
-      // Método .run(...params)
       run(...params) {
         const flatParams = params.length === 1 && Array.isArray(params[0]) ? params[0] : params;
 
@@ -207,7 +209,6 @@ const dbWrapper = {
           if (!pgPool) throw new Error('PostgreSQL Pool no inicializado');
           let pgSql = normalizeSqlForPostgres(sql);
 
-          // Si es INSERT y no incluye RETURNING, agregar RETURNING id para obtener lastInsertRowid
           if (/^\s*INSERT\s+INTO/i.test(pgSql) && !/RETURNING/i.test(pgSql) && !/counter_services/i.test(pgSql)) {
             pgSql += ' RETURNING id';
           }

@@ -68,19 +68,17 @@ echo [OK] Base de datos PostgreSQL local sincronizada e importada con exito.
 :: 6. CREAR ACCESO DIRECTO EN EL ESCRITORIO
 echo.
 echo [PASO 4/5] Creando acceso directo en el Escritorio...
-set "DESKTOP_PATH=%USERPROFILE%\Desktop"
 set "TARGET_BAT=%ROOT_DIR%\Iniciar_DEATurnos_Servidor.bat"
 
-powershell -Command "$s=(New-Object -COM WScript.Shell).CreateShortcut('%DESKTOP_PATH%\DEATurnos - Sistema de Turnos HomeCare.lnk'); $s.TargetPath='%TARGET_BAT%'; $s.WorkingDirectory='%ROOT_DIR%'; $s.Description='Acceso Directo Servidor DEATurnos'; $s.IconLocation='C:\Windows\System32\shell32.dll,14'; $s.Save()"
+powershell -Command "$dt=[Environment]::GetFolderPath('Desktop'); if ($dt) { $s=(New-Object -COM WScript.Shell).CreateShortcut(\"$dt\DEATurnos - Sistema de Turnos HomeCare.lnk\"); $s.TargetPath='%TARGET_BAT%'; $s.WorkingDirectory='%ROOT_DIR%'; $s.Description='Acceso Directo Servidor DEATurnos'; $s.IconLocation='C:\Windows\System32\shell32.dll,14'; $s.Save() }"
 
 echo [OK] Acceso directo generado en el Escritorio.
 
 :: 7. REGISTRAR ARRANQUE AUTOMÁTICO AL ENCENDER WINDOWS
 echo.
 echo [PASO 5/5] Registrando inicio automatico al encender el equipo (Windows Startup)...
-set "STARTUP_PATH=%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup"
 
-powershell -Command "$s=(New-Object -COM WScript.Shell).CreateShortcut('%STARTUP_PATH%\DEATurnos_AutoStart.lnk'); $s.TargetPath='%TARGET_BAT%'; $s.WorkingDirectory='%ROOT_DIR%'; $s.WindowStyle=7; $s.Save()"
+powershell -Command "$su=[Environment]::GetFolderPath('Startup'); if ($su) { $s=(New-Object -COM WScript.Shell).CreateShortcut(\"$su\DEATurnos_AutoStart.lnk\"); $s.TargetPath='%TARGET_BAT%'; $s.WorkingDirectory='%ROOT_DIR%'; $s.WindowStyle=7; $s.Save() }"
 
 echo [OK] Auto-arranque registrado en Inicio de Windows.
 

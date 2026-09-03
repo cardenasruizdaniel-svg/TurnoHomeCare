@@ -77,7 +77,7 @@ async function setupPgDatabase() {
   if (fs.existsSync(envPath) && workingPassword !== null) {
     try {
       let envText = fs.readFileSync(envPath, 'utf8');
-      const passPart = workingPassword ? `:${workingPassword}` : '';
+      const passPart = `:${workingPassword}`;
       const targetUrl = `DATABASE_URL=postgres://postgres${passPart}@localhost:5432/deaturnos`;
       if (envText.includes('DATABASE_URL=')) {
         envText = envText.replace(/DATABASE_URL=.*/g, targetUrl);
