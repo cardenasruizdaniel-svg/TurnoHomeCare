@@ -36,7 +36,12 @@ async function request(endpoint, options = {}) {
 
 export const api = {
   // Autenticación
-  login: (credentials) => request('/auth/login', { method: 'POST', body: JSON.stringify(credentials) }),
+  login: (usernameOrCredentials, password) => {
+    const body = typeof usernameOrCredentials === 'object' && usernameOrCredentials !== null
+      ? usernameOrCredentials
+      : { username: usernameOrCredentials, password };
+    return request('/auth/login', { method: 'POST', body: JSON.stringify(body) });
+  },
   getMe: () => request('/auth/me'),
 
   // Datos Institucionales y Sedes
