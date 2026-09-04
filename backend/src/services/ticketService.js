@@ -327,7 +327,7 @@ class TicketService {
           UPDATE tickets 
           SET status = 'FINALIZADO', completed_at = CURRENT_TIMESTAMP,
               attention_time_seconds = CASE 
-                WHEN attended_at IS NOT NULL THEN (strftime('%s', 'now') - strftime('%s', attended_at))
+                WHEN attended_at IS NOT NULL THEN ${db.isPostgres() ? "ROUND(EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - attended_at)))" : "(strftime('%s', 'now') - strftime('%s', attended_at))"}
                 ELSE 0 END
           WHERE id = ?
         `).run(currentActive.id);
@@ -361,7 +361,7 @@ class TicketService {
             user_id = ?,
             called_at = CURRENT_TIMESTAMP,
             call_count = call_count + 1,
-            wait_time_seconds = (strftime('%s', 'now') - strftime('%s', created_at))
+            wait_time_seconds = ${db.isPostgres() ? "ROUND(EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - created_at)))" : "(strftime('%s', 'now') - strftime('%s', created_at))"}
         WHERE id = ? AND status = 'ESPERANDO'
       `).run(counterId, userId, targetTicket.id);
 
@@ -487,8 +487,8 @@ class TicketService {
           completed_at = CURRENT_TIMESTAMP,
           notes = COALESCE(?, notes),
           attention_time_seconds = CASE 
-            WHEN attended_at IS NOT NULL THEN (strftime('%s', 'now') - strftime('%s', attended_at))
-            ELSE (strftime('%s', 'now') - strftime('%s', called_at))
+            WHEN attended_at IS NOT NULL THEN ${db.isPostgres() ? "ROUND(EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - attended_at)))" : "(strftime('%s', 'now') - strftime('%s', attended_at))"}
+            ELSE ${db.isPostgres() ? "ROUND(EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - called_at)))" : "(strftime('%s', 'now') - strftime('%s', called_at))"}
           END
       WHERE id = ?
     `).run(notes, ticketId);

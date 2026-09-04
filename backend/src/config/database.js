@@ -60,6 +60,11 @@ function normalizeSqlForPostgres(sql) {
   pgSql = pgSql.replace(/date\(([^,\)]+),\s*'localtime'\)/gi, 'DATE($1)');
   pgSql = pgSql.replace(/datetime\('now'\)/gi, 'CURRENT_TIMESTAMP');
   
+  // Reemplazar strftime de SQLite por expresiones nativas de PostgreSQL
+  pgSql = pgSql.replace(/\(strftime\('%s',\s*'now'\)\s*-\s*strftime\('%s',\s*([^)]+)\)\)/gi, 'ROUND(EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - $1)))');
+  pgSql = pgSql.replace(/strftime\('%s',\s*'now'\)/gi, 'EXTRACT(EPOCH FROM CURRENT_TIMESTAMP)');
+  pgSql = pgSql.replace(/strftime\('%s',\s*([^)]+)\)/gi, 'EXTRACT(EPOCH FROM $1)');
+  
   if (/INSERT\s+OR\s+IGNORE\s+INTO\s+(\w+)/i.test(pgSql)) {
     pgSql = pgSql.replace(/INSERT\s+OR\s+IGNORE\s+INTO/i, 'INSERT INTO');
     if (!pgSql.includes('ON CONFLICT')) {
