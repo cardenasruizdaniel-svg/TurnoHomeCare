@@ -1122,9 +1122,16 @@ class TicketService {
     let conditions = ['t.branch_id = ?'];
     let params = [branchId];
 
+    const isTargetToday = targetDate === today;
+
     if (date) {
-      conditions.push('(t.scheduled_date = ? OR (t.scheduled_date IS NULL AND t.created_date = ?))');
-      params.push(date, date);
+      if (isTargetToday) {
+        conditions.push('(t.scheduled_date = ? OR (t.scheduled_date IS NULL AND t.created_date = ?) OR t.status IN (\'ESPERANDO\', \'LLAMADO\', \'EN_ATENCION\'))');
+        params.push(date, date);
+      } else {
+        conditions.push('(t.scheduled_date = ? OR (t.scheduled_date IS NULL AND t.created_date = ?))');
+        params.push(date, date);
+      }
     } else if (startDate && endDate) {
       conditions.push('COALESCE(t.scheduled_date, t.created_date) BETWEEN ? AND ?');
       params.push(startDate, endDate);
@@ -1199,6 +1206,10 @@ class TicketService {
     }
 
     // Métricas del día seleccionado
+    const dateMetricsCondition = isTargetToday 
+      ? '(scheduled_date = ? OR (scheduled_date IS NULL AND created_date = ?) OR status IN (\'ESPERANDO\', \'LLAMADO\', \'EN_ATENCION\'))'
+      : '(scheduled_date = ? OR (scheduled_date IS NULL AND created_date = ?))';
+
     const metricsRow = await db.prepare(`
       SELECT 
         COUNT(*) as total_dia,
@@ -1209,14 +1220,14 @@ class TicketService {
         SUM(CASE WHEN status = 'NO_PRESENTO' THEN 1 ELSE 0 END) as no_presentados
       FROM tickets
       WHERE branch_id = ?
-        AND (scheduled_date = ? OR (scheduled_date IS NULL AND created_date = ?))
+        AND ${dateMetricsCondition}
     `).get(branchId, targetDate, targetDate);
 
     const activeCountersCount = await db.prepare(`
       SELECT COUNT(DISTINCT counter_id) as count
       FROM tickets
       WHERE branch_id = ?
-        AND (scheduled_date = ? OR (scheduled_date IS NULL AND created_date = ?))
+        AND ${dateMetricsCondition}
         AND counter_id IS NOT NULL
         AND status IN ('PROGRAMADO', 'ESPERANDO', 'LLAMADO', 'EN_ATENCION')
     `).get(branchId, targetDate, targetDate);
