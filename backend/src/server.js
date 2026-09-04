@@ -2,41 +2,40 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
-const morgan = require('morgan');
 const path = require('path');
 const fs = require('fs');
 require('dotenv').config();
 
-const { setupSocket } = require('./socket/socketHandler');
-const apiRoutes = require('./routes/api');
-const initDatabase = require('./database/init');
-const seedDatabase = require('./database/seed');
-const syncServicesAndCounters = require('./database/syncServicesAndCounters');
 const db = require('./config/database');
+const initDatabase = require('./database/init');
+const syncServicesAndCounters = require('./database/syncServicesAndCounters');
 
 const app = express();
 const server = http.createServer(app);
 
-// Configuración de Socket.IO con CORS amplio
+// Configuración de CORS y WebSocket
 const io = new Server(server, {
   cors: {
     origin: '*',
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH']
+    methods: ['GET', 'POST', 'PUT', 'DELETE']
   }
 });
 
-setupSocket(io);
-
-// Middlewares
 app.use(cors());
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ limit: '50mb', extended: true }));
-app.use(morgan('dev'));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// Rutas de API
+// Hacer IO accesible en req
+app.use((req, res, next) => {
+  req.io = io;
+  next();
+});
+
+// Registrar Rutas API
+const apiRoutes = require('./routes/api');
 app.use('/api', apiRoutes);
 
-// Servir frontend compilado en producción (dist)
+// Servir frontend compilado en producción
 const frontendDist = path.join(__dirname, '../../frontend/dist');
 if (fs.existsSync(frontendDist)) {
   app.use(express.static(frontendDist));
@@ -50,7 +49,7 @@ app.get('*', (req, res, next) => {
   }
   res.status(200).json({
     status: 'DEATurnos API running',
-    message: 'Frontend no compilado aún. Ejecute "npm run build" o use el servidor de desarrollo en http://localhost:5173'
+    message: 'Frontend no compilado aún. Ejecute "npm run build" o utilice el instalador'
   });
 });
 
@@ -66,7 +65,46 @@ app.use((err, req, res, next) => {
 
 const TunnelService = require('./services/tunnelService');
 
-const PORT = process.env.PORT || 5000;
+const DEFAULT_PORT = Number(process.env.PORT) || 5000;
+
+function listenOnAvailablePort(initialPort) {
+  return new Promise((resolve, reject) => {
+    let currentPort = Number(initialPort) || 5000;
+
+    function tryListen(portToTry) {
+      const tempServer = server.listen(portToTry, async () => {
+        console.log(`====================================================`);
+        console.log(` DEATurnos Backend Server iniciado en puerto ${portToTry}`);
+        console.log(` Acceso Local: http://localhost:${portToTry}`);
+        console.log(` API Endpoint: http://localhost:${portToTry}/api`);
+        console.log(` Red Local: http://${TunnelService.getLocalIP()}:${portToTry}`);
+        console.log(`====================================================`);
+
+        try {
+          const dataDir = path.join(__dirname, '../data');
+          if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+          fs.writeFileSync(path.join(dataDir, 'active_port.txt'), String(portToTry), 'utf8');
+        } catch (e) {}
+
+        if (process.env.ENABLE_TUNNEL === 'true' || process.argv.includes('--tunnel')) {
+          await TunnelService.startTunnel({ port: portToTry });
+        }
+        resolve(portToTry);
+      });
+
+      tempServer.once('error', (err) => {
+        if (err.code === 'EADDRINUSE') {
+          console.warn(`⚠️ Puerto ${portToTry} ocupado. Probando puerto ${portToTry + 1}...`);
+          tryListen(portToTry + 1);
+        } else {
+          reject(err);
+        }
+      });
+    }
+
+    tryListen(currentPort);
+  });
+}
 
 async function startServer() {
   await db.init();
@@ -77,19 +115,7 @@ async function startServer() {
     console.error('Error durante la inicialización del servidor:', e);
   }
 
-  server.listen(PORT, async () => {
-    console.log(`====================================================`);
-    console.log(` DEATurnos Backend Server iniciado en puerto ${PORT}`);
-    console.log(` API Endpoint: http://localhost:${PORT}/api`);
-    console.log(` WebSocket: Activo y escuchando conexiones`);
-    console.log(` Red Local: http://${TunnelService.getLocalIP()}:${PORT}`);
-    console.log(`====================================================`);
-
-    // Iniciar túnel si está configurado en .env o por argumento de línea de comando
-    if (process.env.ENABLE_TUNNEL === 'true' || process.argv.includes('--tunnel')) {
-      await TunnelService.startTunnel({ port: PORT });
-    }
-  });
+  await listenOnAvailablePort(DEFAULT_PORT);
 }
 
 startServer();

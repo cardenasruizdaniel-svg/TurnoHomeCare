@@ -26,15 +26,21 @@ echo [1/2] Verificando base de datos y esquema...
 node src/database/init.js >nul 2>&1
 node src/database/syncServicesAndCounters.js >nul 2>&1
 
-echo [2/2] Activando Servidor Unificado DEATurnos (Puerto 5000)...
+echo [2/2] Activando Servidor Unificado DEATurnos...
 start "DEATurnos Servidor Unificado" /min cmd /c "cd /d ""%ROOT_DIR%\backend"" && npm start"
 
-timeout /t 3 >nul
-start http://localhost:5000
+timeout /t 4 >nul
+
+set "PORT_TO_OPEN=5000"
+if exist "%ROOT_DIR%\backend\data\active_port.txt" (
+    set /p PORT_TO_OPEN=<"%ROOT_DIR%\backend\data\active_port.txt"
+)
+
+start http://localhost:%PORT_TO_OPEN%
 
 echo =========================================================================
 echo  ¡SISTEMA ACTIVO Y EN EJECUCION TRANSPARENTE!
-echo  Acceso Local: http://localhost:5000
-echo  Servidor API: http://localhost:5000/api
+echo  Acceso Local: http://localhost:%PORT_TO_OPEN%
+echo  Servidor API: http://localhost:%PORT_TO_OPEN%/api
 echo =========================================================================
 exit
