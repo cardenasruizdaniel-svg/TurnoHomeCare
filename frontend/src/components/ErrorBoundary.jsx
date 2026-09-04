@@ -33,8 +33,14 @@ export class ErrorBoundary extends React.Component {
                 try {
                   localStorage.clear();
                   sessionStorage.clear();
+                  if ('caches' in window) {
+                    caches.keys().then(names => {
+                      names.forEach(name => caches.delete(name));
+                    });
+                  }
                 } catch (e) {}
-                window.location.href = '/';
+                this.setState({ hasError: false, error: null });
+                window.location.replace('/');
               }}
               className="w-full py-3 bg-pink-600 hover:bg-pink-500 text-white font-bold rounded-xl shadow-lg shadow-pink-600/30 transition-all duration-200"
             >

@@ -54,5 +54,21 @@ export function BrandingProvider({ children }) {
 }
 
 export function useBranding() {
-  return useContext(BrandingContext);
+  const context = useContext(BrandingContext);
+  if (!context) {
+    return {
+      company: {
+        name: 'HomeCare del Quindío I.P.S.',
+        slogan: 'Bienestar en casa.',
+        logo_url: '/homecare-logo.png',
+        primary_color: '#e1136c',
+        secondary_color: '#00b0b9',
+        accent_color: '#7cb518'
+      },
+      settings: {},
+      loading: false,
+      refreshBranding: () => {}
+    };
+  }
+  return context;
 }
