@@ -8,8 +8,9 @@ export function SocketProvider({ children }) {
   const [connected, setConnected] = useState(false);
 
   useEffect(() => {
-    // Conectar a socket.io en el mismo host o proxy
-    const s = io(window.location.origin, {
+    // Conectar directamente a backend en puerto 5000 o al origen de produccion
+    const targetUrl = window.location.port === '5173' ? 'http://localhost:5000' : window.location.origin;
+    const s = io(targetUrl, {
       transports: ['websocket', 'polling'],
       reconnectionAttempts: 10,
       reconnectionDelay: 1000

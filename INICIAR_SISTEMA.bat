@@ -1,39 +1,40 @@
 @echo off
-chcp 65001 >nul
-title DEATurnos - Servidor en Ejecución
-color 0A
+setlocal enabledelayedexpansion
+title DEATurnos - Servidor HomeCare Enterprise
+color 0B
 
-echo ================================================================
-echo                      INICIANDO DEATURNOS PRO
-echo        Sistema Profesional de Gestión de Turnos con QR
-echo ================================================================
+:: Detectar ruta raiz dinamicamente en cualquier disco (C:, D:, etc.)
+set "ROOT_DIR=%~dp0"
+if "%ROOT_DIR:~-1%"=="\" set "ROOT_DIR=%ROOT_DIR:~0,-1%"
+
+echo =========================================================================
+echo    HomeCare Enterprise - Servidor de Gestión de Turnos por Fechas
+echo =========================================================================
+echo  Ubicacion: %ROOT_DIR%
 echo.
 
-:: Verificar si existe la carpeta node_modules en backend
-if not exist "%~dp0backend\node_modules\" (
-    color 0C
-    echo [AVISO] Las dependencias no están instaladas.
-    echo Ejecutando instalador automático por primera vez...
-    echo.
-    call "%~dp0INSTALAR_TODO.bat"
+cd /d "%ROOT_DIR%\backend"
+if not exist .env (
+    echo PORT=5000 > .env
+    echo NODE_ENV=development >> .env
+    echo DATABASE_URL=postgres://postgres:admin123@localhost:5432/deaturnos >> .env
+    echo JWT_SECRET=deaturnos_super_secret_jwt_key_homecare_2026 >> .env
+    echo ENABLE_TUNNEL=false >> .env
 )
 
-:: Si frontend dist no existe, compilarlo
-if not exist "%~dp0frontend\dist\" (
-    echo [INFO] Compilando frontend para producción...
-    cd "%~dp0frontend"
-    call npm run build
-    cd "%~dp0"
-)
+echo [1/2] Verificando base de datos y esquema...
+node src/database/init.js >nul 2>&1
+node src/database/syncServicesAndCounters.js >nul 2>&1
 
-echo [INFO] Iniciando Servidor API y WebSockets en http://localhost:5000 ...
-echo [INFO] Abriendo navegador automáticamente...
-echo.
+echo [2/2] Activando Servidor Unificado DEATurnos (Puerto 5000)...
+start "DEATurnos Servidor Unificado" /min cmd /c "cd /d ""%ROOT_DIR%\backend"" && npm start"
 
-:: Abrir navegador tras 2 segundos
-start "" powershell -Command "Start-Sleep -Seconds 2; Start-Process 'http://localhost:5000'"
+timeout /t 3 >nul
+start http://localhost:5000
 
-cd "%~dp0backend"
-node src/server.js
-
-pause
+echo =========================================================================
+echo  ¡SISTEMA ACTIVO Y EN EJECUCION TRANSPARENTE!
+echo  Acceso Local: http://localhost:5000
+echo  Servidor API: http://localhost:5000/api
+echo =========================================================================
+exit
