@@ -8,18 +8,22 @@ import { SocketProvider } from './context/SocketContext.jsx';
 import { BrandingProvider } from './context/BrandingContext.jsx';
 import { ThemeProvider } from './context/ThemeContext.jsx';
 
+import { ErrorBoundary } from './components/ErrorBoundary.jsx';
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <BrowserRouter>
-      <ThemeProvider>
-        <BrandingProvider>
-          <AuthProvider>
-            <SocketProvider>
-              <App />
-            </SocketProvider>
-          </AuthProvider>
-        </BrandingProvider>
-      </ThemeProvider>
-    </BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <ThemeProvider>
+          <BrandingProvider>
+            <AuthProvider>
+              <SocketProvider>
+                <App />
+              </SocketProvider>
+            </AuthProvider>
+          </BrandingProvider>
+        </ThemeProvider>
+      </BrowserRouter>
+    </ErrorBoundary>
   </React.StrictMode>,
 );
