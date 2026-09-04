@@ -39,18 +39,23 @@ export const api = {
   login: (credentials) => request('/auth/login', { method: 'POST', body: JSON.stringify(credentials) }),
   getMe: () => request('/auth/me'),
 
-  // Datos Institucionales
+  // Datos Institucionales y Sedes
   getCompany: () => request('/company'),
   getBranches: () => request('/branches'),
+  getPublicBranches: () => request('/branches'),
+  createBranch: (data) => request('/branches', { method: 'POST', body: JSON.stringify(data) }),
+  updateBranch: (id, data) => request(`/branches/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteBranch: (id) => request(`/branches/${id}`, { method: 'DELETE' }),
 
   // Servicios Médicos
   getServices: () => request('/services'),
+  getPublicServices: () => request('/services'),
   createService: (data) => request('/services', { method: 'POST', body: JSON.stringify(data) }),
   updateService: (id, data) => request(`/services/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteService: (id) => request(`/services/${id}`, { method: 'DELETE' }),
 
   // Módulos / Consultorios
-  getCounters: () => request('/counters'),
+  getCounters: (branchId) => request(`/counters${branchId ? `?branchId=${branchId}` : ''}`),
   createCounter: (data) => request('/counters', { method: 'POST', body: JSON.stringify(data) }),
   updateCounter: (id, data) => request(`/counters/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteCounter: (id) => request(`/counters/${id}`, { method: 'DELETE' }),
@@ -74,6 +79,7 @@ export const api = {
   transferTicket: (data) => request('/tickets/transfer', { method: 'POST', body: JSON.stringify(data) }),
   pauseTicket: (data) => request('/tickets/pause', { method: 'POST', body: JSON.stringify(data) }),
   recallTicket: (data) => request('/tickets/recall', { method: 'POST', body: JSON.stringify(data) }),
+  trackTicket: (id) => request(`/tickets/track/${id}`),
 
   // Colas y Pantalla Pública
   getWaitingQueue: (branchId, counterId) => request(`/tickets/queue/${branchId}${counterId ? `?counterId=${counterId}` : ''}`),
@@ -82,9 +88,11 @@ export const api = {
   // Estadísticas y Reportes
   getDashboardStats: (branchId, date) => request(`/stats/dashboard${buildQueryString({ branchId, date })}`),
   getTicketHistory: (params) => request(`/stats/tickets${buildQueryString(params)}`),
+  getExportCSVUrl: (params) => `${API_BASE}/stats/export/csv${buildQueryString(params)}`,
 
-  // Configuraciones
+  // Configuraciones y Branding
   getSettings: (branchId) => request(`/settings${branchId ? `?branchId=${branchId}` : ''}`),
+  getPublicSettings: (branchId) => request(`/settings${branchId ? `?branchId=${branchId}` : ''}`),
   updateSetting: (data) => request('/settings', { method: 'PUT', body: JSON.stringify(data) }),
   updateSettingsBatch: (data) => request('/settings/batch', { method: 'PUT', body: JSON.stringify(data) }),
 
