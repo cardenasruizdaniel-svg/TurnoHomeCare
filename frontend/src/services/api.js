@@ -45,16 +45,16 @@ export const api = {
   getMe: () => request('/auth/me'),
 
   // Datos Institucionales y Sedes
-  getCompany: () => request('/company'),
+  getCompany: () => request('/branches/public'),
   getBranches: () => request('/branches'),
-  getPublicBranches: () => request('/branches'),
+  getPublicBranches: () => request('/branches/public'),
   createBranch: (data) => request('/branches', { method: 'POST', body: JSON.stringify(data) }),
   updateBranch: (id, data) => request(`/branches/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteBranch: (id) => request(`/branches/${id}`, { method: 'DELETE' }),
 
   // Servicios Médicos
   getServices: () => request('/services'),
-  getPublicServices: () => request('/services'),
+  getPublicServices: () => request('/services/public'),
   createService: (data) => request('/services', { method: 'POST', body: JSON.stringify(data) }),
   updateService: (id, data) => request(`/services/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteService: (id) => request(`/services/${id}`, { method: 'DELETE' }),
@@ -72,7 +72,7 @@ export const api = {
   deleteUser: (id) => request(`/users/${id}`, { method: 'DELETE' }),
 
   // Pacientes
-  checkPatient: (documentNumber) => request(`/tickets/patient-check/${documentNumber}`),
+  checkPatient: (documentNumber) => request(`/patients/check/${documentNumber}`),
 
   // Turnos Operativos
   requestTicket: (ticketData) => request('/tickets/request', { method: 'POST', body: JSON.stringify(ticketData) }),
@@ -97,7 +97,7 @@ export const api = {
 
   // Configuraciones y Branding
   getSettings: (branchId) => request(`/settings${branchId ? `?branchId=${branchId}` : ''}`),
-  getPublicSettings: (branchId) => request(`/settings${branchId ? `?branchId=${branchId}` : ''}`),
+  getPublicSettings: (branchId) => request(`/settings/public${branchId ? `?branchId=${branchId}` : ''}`),
   updateSetting: (data) => request('/settings', { method: 'PUT', body: JSON.stringify(data) }),
   updateSettingsBatch: (data) => request('/settings/batch', { method: 'PUT', body: JSON.stringify(data) }),
 

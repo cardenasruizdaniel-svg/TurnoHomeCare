@@ -34,6 +34,7 @@ router.get('/auth/me', authenticateToken, AuthController.getMe);
 // 2. RUTAS PÚBLICAS (Móvil, QR, Pantalla TV)
 // -------------------------------------------------------------
 router.get('/patients/check/:documentNumber', TicketController.checkPatient);
+router.get('/tickets/patient-check/:documentNumber', TicketController.checkPatient);
 router.post('/tickets/request', TicketController.requestTicket);
 router.get('/tickets/track/:id', TicketController.trackTicket);
 router.get('/tickets/public-display/:branchId', TicketController.getPublicDisplay);
