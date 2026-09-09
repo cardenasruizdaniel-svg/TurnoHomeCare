@@ -44,11 +44,33 @@ export function RequestTicketView() {
   const [errorMsg, setErrorMsg] = useState('');
   const [generatedTicketData, setGeneratedTicketData] = useState(null);
 
+  const [loadingServices, setLoadingServices] = useState(true);
+
+  const loadInitialData = async () => {
+    try {
+      setLoadingServices(true);
+      const [brRes, srvRes] = await Promise.all([
+        api.getPublicBranches().catch(() => ({ success: false })),
+        api.getPublicServices().catch(() => ({ success: false }))
+      ]);
+      if (brRes && brRes.success && brRes.branches) setBranches(brRes.branches);
+      if (srvRes && srvRes.success && srvRes.services) setServices(srvRes.services);
+    } catch (err) {
+      console.error('Error cargando servicios/sedes públicos:', err);
+    } finally {
+      setLoadingServices(false);
+    }
+  };
+
   useEffect(() => {
-    // Cargar sedes y servicios disponibles
-    api.getPublicBranches().then(res => res.success && setBranches(res.branches));
-    api.getPublicServices().then(res => res.success && setServices(res.services));
+    loadInitialData();
   }, []);
+
+  useEffect(() => {
+    if (step === 3 && services.length === 0 && !loadingServices) {
+      loadInitialData();
+    }
+  }, [step]);
 
   // Paso 1: Consultar Cédula
   const handleCheckDocument = async (e) => {
@@ -321,29 +343,47 @@ export function RequestTicketView() {
               </p>
 
               <div className="space-y-2.5">
-                {services.map((s) => (
-                  <button
-                    key={s.id}
-                    disabled={loading}
-                    onClick={() => handleRequestTicket(s.id)}
-                    className="w-full text-left p-4 rounded-2xl bg-slate-950/80 hover:bg-slate-800/80 border border-slate-800 hover:border-sky-500/50 transition-all duration-200 group flex items-center justify-between shadow-md"
-                  >
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="w-7 h-7 rounded-lg bg-sky-500/20 text-sky-400 font-bold font-mono text-xs flex items-center justify-center border border-sky-500/30">
-                          {isSeniorPriority ? (s.priority_prefix || 'P') : (s.letter_prefix || 'A')}
-                        </span>
-                        <span className="font-bold text-sm text-white group-hover:text-sky-300 transition">
-                          {s.name}
-                        </span>
+                {loadingServices ? (
+                  <div className="p-6 text-center text-xs text-sky-400 font-semibold flex items-center justify-center gap-2">
+                    <span className="w-4 h-4 border-2 border-sky-400 border-t-transparent rounded-full animate-spin"></span>
+                    Cargando servicios disponibles...
+                  </div>
+                ) : services.length === 0 ? (
+                  <div className="p-6 text-center space-y-3 bg-slate-950/60 rounded-2xl border border-slate-800">
+                    <p className="text-xs text-slate-400 font-medium">No se cargaron servicios automáticamente.</p>
+                    <button
+                      type="button"
+                      onClick={loadInitialData}
+                      className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-md transition"
+                    >
+                      Cargar Servicios
+                    </button>
+                  </div>
+                ) : (
+                  services.map((s) => (
+                    <button
+                      key={s.id}
+                      disabled={loading}
+                      onClick={() => handleRequestTicket(s.id)}
+                      className="w-full text-left p-4 rounded-2xl bg-slate-950/80 hover:bg-slate-800/80 border border-slate-800 hover:border-sky-500/50 transition-all duration-200 group flex items-center justify-between shadow-md"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="w-7 h-7 rounded-lg bg-sky-500/20 text-sky-400 font-bold font-mono text-xs flex items-center justify-center border border-sky-500/30">
+                            {isSeniorPriority ? (s.priority_prefix || 'P') : (s.letter_prefix || 'A')}
+                          </span>
+                          <span className="font-bold text-sm text-white group-hover:text-sky-300 transition">
+                            {s.name}
+                          </span>
+                        </div>
+                        {s.description && (
+                          <p className="text-xs text-slate-400 pl-9">{s.description}</p>
+                        )}
                       </div>
-                      {s.description && (
-                        <p className="text-xs text-slate-400 pl-9">{s.description}</p>
-                      )}
-                    </div>
-                    <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-sky-400 group-hover:translate-x-1 transition" />
-                  </button>
-                ))}
+                      <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-sky-400 group-hover:translate-x-1 transition" />
+                    </button>
+                  ))
+                )}
               </div>
             </div>
 
