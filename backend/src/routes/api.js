@@ -49,6 +49,8 @@ router.get('/counters/public', CounterController.getAll);
 // -------------------------------------------------------------
 router.get('/tickets/queue/:branchId?', authenticateToken, TicketController.getWaitingQueue);
 router.post('/tickets/call-next', authenticateToken, TicketController.callNext);
+
+// Rutas con ID en URL
 router.post('/tickets/:id/recall', authenticateToken, TicketController.recall);
 router.post('/tickets/:id/start-attention', authenticateToken, TicketController.startAttention);
 router.post('/tickets/:id/complete', authenticateToken, TicketController.complete);
@@ -56,11 +58,21 @@ router.post('/tickets/:id/transfer', authenticateToken, TicketController.transfe
 router.post('/tickets/:id/no-show', authenticateToken, TicketController.markNoShow);
 router.post('/tickets/:id/pause', authenticateToken, TicketController.pause);
 
+// Alias con ID en cuerpo JSON
+router.post('/tickets/recall', authenticateToken, TicketController.recall);
+router.post('/tickets/start-attention', authenticateToken, TicketController.startAttention);
+router.post('/tickets/complete', authenticateToken, TicketController.complete);
+router.post('/tickets/transfer', authenticateToken, TicketController.transfer);
+router.post('/tickets/no-show', authenticateToken, TicketController.markNoShow);
+router.post('/tickets/pause', authenticateToken, TicketController.pause);
+
 // Programación de turnos y modificación directa sin llamar
 router.get('/schedule', authenticateToken, TicketController.getSchedule);
 router.post('/schedule', authenticateToken, TicketController.createSchedule);
 router.put('/tickets/:id/edit-uncalled', authenticateToken, TicketController.editUncalled);
+router.put('/tickets/edit-uncalled', authenticateToken, TicketController.editUncalled);
 router.post('/tickets/:id/cancel-uncalled', authenticateToken, TicketController.cancelUncalled);
+router.post('/tickets/cancel-uncalled', authenticateToken, TicketController.cancelUncalled);
 
 // -------------------------------------------------------------
 // 4. RUTAS DE ADMINISTRACIÓN Y SUPERVISIÓN (Protegidas)

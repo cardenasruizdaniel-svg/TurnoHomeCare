@@ -78,12 +78,40 @@ export const api = {
   requestTicket: (ticketData) => request('/tickets/request', { method: 'POST', body: JSON.stringify(ticketData) }),
   callNextTicket: (data) => request('/tickets/call-next', { method: 'POST', body: JSON.stringify(data) }),
   callSpecificTicket: (data) => request('/tickets/call-specific', { method: 'POST', body: JSON.stringify(data) }),
-  startAttention: (data) => request('/tickets/start-attention', { method: 'POST', body: JSON.stringify(data) }),
-  completeTicket: (data) => request('/tickets/complete', { method: 'POST', body: JSON.stringify(data) }),
-  markNoShow: (data) => request('/tickets/no-show', { method: 'POST', body: JSON.stringify(data) }),
-  transferTicket: (data) => request('/tickets/transfer', { method: 'POST', body: JSON.stringify(data) }),
-  pauseTicket: (data) => request('/tickets/pause', { method: 'POST', body: JSON.stringify(data) }),
-  recallTicket: (data) => request('/tickets/recall', { method: 'POST', body: JSON.stringify(data) }),
+  startAttention: (ticketIdOrData) => {
+    const id = typeof ticketIdOrData === 'object' && ticketIdOrData !== null ? ticketIdOrData.id : ticketIdOrData;
+    return request(`/tickets/${id}/start-attention`, { method: 'POST', body: JSON.stringify({ id }) });
+  },
+  completeTicket: (ticketIdOrData, notes = null) => {
+    let id = ticketIdOrData;
+    let bodyNotes = notes;
+    if (typeof ticketIdOrData === 'object' && ticketIdOrData !== null) {
+      id = ticketIdOrData.id || ticketIdOrData.ticketId;
+      bodyNotes = ticketIdOrData.notes || notes;
+    }
+    return request(`/tickets/${id}/complete`, { method: 'POST', body: JSON.stringify({ id, notes: bodyNotes }) });
+  },
+  markNoShow: (ticketIdOrData) => {
+    const id = typeof ticketIdOrData === 'object' && ticketIdOrData !== null ? ticketIdOrData.id : ticketIdOrData;
+    return request(`/tickets/${id}/no-show`, { method: 'POST', body: JSON.stringify({ id }) });
+  },
+  transferTicket: (ticketIdOrData, data = {}) => {
+    let id = ticketIdOrData;
+    let payload = data;
+    if (typeof ticketIdOrData === 'object' && ticketIdOrData !== null) {
+      id = ticketIdOrData.id || ticketIdOrData.ticketId;
+      payload = ticketIdOrData;
+    }
+    return request(`/tickets/${id}/transfer`, { method: 'POST', body: JSON.stringify({ id, ...payload }) });
+  },
+  pauseTicket: (ticketIdOrData) => {
+    const id = typeof ticketIdOrData === 'object' && ticketIdOrData !== null ? ticketIdOrData.id : ticketIdOrData;
+    return request(`/tickets/${id}/pause`, { method: 'POST', body: JSON.stringify({ id }) });
+  },
+  recallTicket: (ticketIdOrData) => {
+    const id = typeof ticketIdOrData === 'object' && ticketIdOrData !== null ? ticketIdOrData.id : ticketIdOrData;
+    return request(`/tickets/${id}/recall`, { method: 'POST', body: JSON.stringify({ id }) });
+  },
   trackTicket: (id) => request(`/tickets/track/${id}`),
 
   // Colas y Pantalla Pública

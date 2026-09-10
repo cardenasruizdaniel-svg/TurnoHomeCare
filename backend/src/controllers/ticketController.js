@@ -163,12 +163,25 @@ class TicketController {
     }
   }
 
+  static getTicketId(req) {
+    if (req.params && req.params.id && !isNaN(Number(req.params.id))) return Number(req.params.id);
+    if (req.body) {
+      if (typeof req.body === 'object' && req.body !== null) {
+        if (req.body.id && !isNaN(Number(req.body.id))) return Number(req.body.id);
+        if (req.body.ticketId && !isNaN(Number(req.body.ticketId))) return Number(req.body.ticketId);
+      }
+      if (!isNaN(Number(req.body))) return Number(req.body);
+    }
+    return null;
+  }
+
   /**
    * Re-llamar el turno actual
    */
   static async recall(req, res) {
     try {
-      const ticketId = Number(req.params.id);
+      const ticketId = TicketController.getTicketId(req);
+      if (!ticketId) return res.status(400).json({ success: false, error: 'ID_TURNO_REQUERIDO' });
       const userId = req.user.id;
 
       const ticket = await TicketService.recallTicket(ticketId, userId);
@@ -194,7 +207,8 @@ class TicketController {
    */
   static async startAttention(req, res) {
     try {
-      const ticketId = Number(req.params.id);
+      const ticketId = TicketController.getTicketId(req);
+      if (!ticketId) return res.status(400).json({ success: false, error: 'ID_TURNO_REQUERIDO' });
       const userId = req.user.id;
 
       const ticket = await TicketService.startAttention(ticketId, userId);
@@ -211,8 +225,9 @@ class TicketController {
    */
   static async complete(req, res) {
     try {
-      const ticketId = Number(req.params.id);
-      const { notes } = req.body;
+      const ticketId = TicketController.getTicketId(req);
+      if (!ticketId) return res.status(400).json({ success: false, error: 'ID_TURNO_REQUERIDO' });
+      const notes = (req.body && typeof req.body === 'object') ? req.body.notes : null;
       const userId = req.user.id;
 
       const ticket = await TicketService.completeTicket(ticketId, userId, notes);
@@ -229,7 +244,8 @@ class TicketController {
    */
   static async markNoShow(req, res) {
     try {
-      const ticketId = Number(req.params.id);
+      const ticketId = TicketController.getTicketId(req);
+      if (!ticketId) return res.status(400).json({ success: false, error: 'ID_TURNO_REQUERIDO' });
       const userId = req.user.id;
 
       const ticket = await TicketService.markNoShow(ticketId, userId);
@@ -246,8 +262,9 @@ class TicketController {
    */
   static async transfer(req, res) {
     try {
-      const ticketId = Number(req.params.id);
-      const { targetServiceId, targetCounterId, notes, fromCounterId } = req.body;
+      const ticketId = TicketController.getTicketId(req);
+      if (!ticketId) return res.status(400).json({ success: false, error: 'ID_TURNO_REQUERIDO' });
+      const { targetServiceId, targetCounterId, notes, fromCounterId } = req.body || {};
       const userId = req.user.id;
 
       const ticket = await TicketService.transferTicket({
@@ -278,7 +295,8 @@ class TicketController {
    */
   static async pause(req, res) {
     try {
-      const ticketId = Number(req.params.id);
+      const ticketId = TicketController.getTicketId(req);
+      if (!ticketId) return res.status(400).json({ success: false, error: 'ID_TURNO_REQUERIDO' });
       const userId = req.user.id;
 
       const ticket = await TicketService.pauseTicket(ticketId, userId);
