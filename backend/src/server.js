@@ -9,6 +9,7 @@ require('dotenv').config();
 const db = require('./config/database');
 const initDatabase = require('./database/init');
 const syncServicesAndCounters = require('./database/syncServicesAndCounters');
+const socketHandler = require('./socket/socketHandler');
 
 const app = express();
 const server = http.createServer(app);
@@ -20,6 +21,9 @@ const io = new Server(server, {
     methods: ['GET', 'POST', 'PUT', 'DELETE']
   }
 });
+
+// Inicializar Manejador de WebSockets para tiempo real (Pantalla TV y Paneles)
+socketHandler.setupSocket(io);
 
 app.use(cors());
 app.use(express.json());

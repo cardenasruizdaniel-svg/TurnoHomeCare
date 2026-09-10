@@ -92,6 +92,10 @@ export function PublicDisplayView() {
 
   useEffect(() => {
     loadDisplayData();
+    const interval = setInterval(() => {
+      loadDisplayData();
+    }, 4000);
+    return () => clearInterval(interval);
   }, [branchId]);
 
   // Manejo de eventos en tiempo real con Socket.IO
@@ -144,12 +148,14 @@ export function PublicDisplayView() {
       socket.on('ticket:called', handleTicketCalled);
       socket.on('ticket:recalled', handleTicketRecalled);
       socket.on('ticket:status_changed', handleStatusChanged);
+      socket.on('queue:updated', handleStatusChanged);
       socket.on('config:updated', handleConfigUpdated);
 
       return () => {
         socket.off('ticket:called', handleTicketCalled);
         socket.off('ticket:recalled', handleTicketRecalled);
         socket.off('ticket:status_changed', handleStatusChanged);
+        socket.off('queue:updated', handleStatusChanged);
         socket.off('config:updated', handleConfigUpdated);
       };
     }
