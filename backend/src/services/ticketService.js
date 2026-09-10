@@ -698,7 +698,7 @@ class TicketService {
     const company = branch ? await db.prepare('SELECT * FROM companies WHERE id = ?').get(branch.company_id) : null;
     const settings = await SettingsService.getAll(branchId);
 
-    const effectiveBaseUrl = TunnelService.getEffectivePublicUrl(process.env.PORT || 5000);
+    const effectiveBaseUrl = await TunnelService.getEffectivePublicUrl(process.env.PORT || 5000);
     const publicRequestUrl = `${effectiveBaseUrl}/solicitar-turno?branchId=${branchId}`;
 
     return {

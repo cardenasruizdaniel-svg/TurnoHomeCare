@@ -14,7 +14,7 @@ class BranchController {
         ORDER BY b.id ASC
       `).all();
 
-      const effectiveBaseUrl = TunnelService.getEffectivePublicUrl(process.env.PORT || 5000);
+      const effectiveBaseUrl = await TunnelService.getEffectivePublicUrl(process.env.PORT || 5000);
 
       const enriched = await Promise.all(branches.map(async (b) => {
         const publicUrl = `${effectiveBaseUrl}/solicitar-turno?branchId=${b.id}`;
@@ -50,7 +50,7 @@ class BranchController {
 
       if (!branch) return res.status(404).json({ success: false, error: 'SEDE_NO_ENCONTRADA' });
 
-      const effectiveBaseUrl = TunnelService.getEffectivePublicUrl(process.env.PORT || 5000);
+      const effectiveBaseUrl = await TunnelService.getEffectivePublicUrl(process.env.PORT || 5000);
       const publicUrl = `${effectiveBaseUrl}/solicitar-turno?branchId=${branch.id}`;
       const qrDataUrl = await QRCode.toDataURL(publicUrl, {
         width: 400,
