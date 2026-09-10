@@ -56,15 +56,7 @@ export function MyTicketView() {
       const speechText = `Atención, turno ${formattedTicket}, por favor acercarse a ${counterName}`;
       
       setTimeout(() => {
-        try {
-          const url = `/api/tts?text=${encodeURIComponent(speechText)}`;
-          const audio = new Audio(url);
-          audio.volume = 1.0;
-          activeAudioRef.current = audio;
-          audio.play().catch(e => console.warn('Audio play error:', e));
-        } catch (e) {
-          console.warn('TTS error:', e);
-        }
+        SoundService.playSpeechOnce(speechText, 1.0);
       }, 1500);
     }
   };

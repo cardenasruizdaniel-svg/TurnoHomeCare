@@ -3,6 +3,9 @@ class SoundService {
   static cachedVoice = null;
   static voicesInitialized = false;
   static currentAudio = null;
+  static activeTimeouts = [];
+  static lastAnnounceTicket = null;
+  static lastAnnounceTime = 0;
 
   static init() {
     if (typeof window === 'undefined') return;
@@ -12,18 +15,19 @@ class SoundService {
 
   static initVoices() {
     if (typeof window === 'undefined' || !window.speechSynthesis) return;
-    if (this.voicesInitialized && this.cachedVoice) return;
 
     const loadVoices = () => {
       try {
         const voices = window.speechSynthesis.getVoices();
         if (voices.length > 0) {
-          this.cachedVoice = voices.find(v => v.lang === 'es-CO' || v.lang === 'es_CO')
-            || voices.find(v => v.lang === 'es-419')
-            || voices.find(v => v.lang === 'es-US' || v.lang === 'es_US')
-            || voices.find(v => v.lang === 'es-MX' || v.lang === 'es_MX')
-            || voices.find(v => v.lang.startsWith('es') || v.lang.includes('Spanish'))
-            || voices[0];
+          // Prioridad: Voz en español de Colombia > México > EE.UU. > España > Cualquier español
+          this.cachedVoice =
+            voices.find(v => v.lang === 'es-CO' || v.lang === 'es_CO') ||
+            voices.find(v => v.lang === 'es-MX' || v.lang === 'es_MX') ||
+            voices.find(v => v.lang === 'es-419') ||
+            voices.find(v => v.lang === 'es-US' || v.lang === 'es_US') ||
+            voices.find(v => v.lang.startsWith('es') || v.lang.includes('Spanish') || v.lang.includes('Español')) ||
+            voices[0];
           this.voicesInitialized = true;
         }
       } catch (e) {
@@ -59,8 +63,8 @@ class SoundService {
 
       const now = ctx.currentTime;
       const gainNode = ctx.createGain();
-      gainNode.gain.setValueAtTime(0.4 * volume, now);
-      gainNode.gain.exponentialRampToValueAtTime(0.001, now + 1.8);
+      gainNode.gain.setValueAtTime(0.35 * volume, now);
+      gainNode.gain.exponentialRampToValueAtTime(0.001, now + 1.6);
       gainNode.connect(ctx.destination);
 
       // Tono 1 (Ding: 587.33 Hz - Re5)
@@ -69,27 +73,27 @@ class SoundService {
       osc1.frequency.setValueAtTime(587.33, now);
       osc1.connect(gainNode);
       osc1.start(now);
-      osc1.stop(now + 0.9);
+      osc1.stop(now + 0.8);
 
       // Tono 2 (Dong: 440 Hz - La4)
       const osc2 = ctx.createOscillator();
       osc2.type = 'sine';
-      osc2.frequency.setValueAtTime(440, now + 0.28);
+      osc2.frequency.setValueAtTime(440, now + 0.25);
       osc2.connect(gainNode);
-      osc2.start(now + 0.28);
-      osc2.stop(now + 1.6);
+      osc2.start(now + 0.25);
+      osc2.stop(now + 1.5);
 
       // Armónico sutil
       const osc3 = ctx.createOscillator();
       osc3.type = 'triangle';
-      osc3.frequency.setValueAtTime(880, now + 0.28);
+      osc3.frequency.setValueAtTime(880, now + 0.25);
       const gain3 = ctx.createGain();
-      gain3.gain.setValueAtTime(0.1 * volume, now + 0.28);
-      gain3.gain.exponentialRampToValueAtTime(0.001, now + 1.3);
+      gain3.gain.setValueAtTime(0.08 * volume, now + 0.25);
+      gain3.gain.exponentialRampToValueAtTime(0.001, now + 1.2);
       osc3.connect(gain3);
       gain3.connect(ctx.destination);
-      osc3.start(now + 0.28);
-      osc3.stop(now + 1.3);
+      osc3.start(now + 0.25);
+      osc3.stop(now + 1.2);
 
     } catch (e) {
       console.warn('No se pudo reproducir campana sonora:', e);
@@ -97,9 +101,26 @@ class SoundService {
   }
 
   /**
-   * Detiene cualquier locución o audio en curso antes de iniciar uno nuevo
+   * Registra un temporizador seguro que se puede cancelar limpiamente con stopAll()
+   */
+  static safeTimeout(fn, delayMs) {
+    const timeoutId = setTimeout(() => {
+      this.activeTimeouts = this.activeTimeouts.filter(id => id !== timeoutId);
+      fn();
+    }, delayMs);
+    this.activeTimeouts.push(timeoutId);
+    return timeoutId;
+  }
+
+  /**
+   * Detiene cualquier locución, audio o temporizador en curso antes de iniciar uno nuevo
    */
   static stopAll() {
+    // 1. Limpiar todos los temporizadores pendientes
+    this.activeTimeouts.forEach(id => clearTimeout(id));
+    this.activeTimeouts = [];
+
+    // 2. Detener audio HTML5 si lo hay
     if (this.currentAudio) {
       try {
         this.currentAudio.pause();
@@ -107,6 +128,8 @@ class SoundService {
       } catch { }
       this.currentAudio = null;
     }
+
+    // 3. Detener síntesis de voz en el navegador
     if (typeof window !== 'undefined' && window.speechSynthesis) {
       try {
         window.speechSynthesis.cancel();
@@ -115,53 +138,9 @@ class SoundService {
   }
 
   /**
-   * Reproduce una locución única con callback onComplete al finalizar
+   * Reproduce una locución única con Web Speech API
    */
   static playSpeechOnce(text, volume = 1.0, onComplete) {
-    if (typeof window === 'undefined') return;
-
-    // 1. Intentar con el stream de audio del servidor (/api/tts)
-    try {
-      const cleanText = encodeURIComponent(text);
-      const url = `/api/tts?text=${cleanText}`;
-      const audio = new Audio(url);
-      audio.volume = volume;
-      this.currentAudio = audio;
-
-      let handled = false;
-      const finish = () => {
-        if (!handled) {
-          handled = true;
-          this.currentAudio = null;
-          if (onComplete) onComplete();
-        }
-      };
-
-      audio.onended = finish;
-      audio.onerror = () => {
-        console.warn('Audio stream error, usando SpeechSynthesis local');
-        this.playLocalSpeechOnce(text, volume, onComplete);
-      };
-
-      const playPromise = audio.play();
-      if (playPromise !== undefined) {
-        playPromise.catch(() => {
-          this.playLocalSpeechOnce(text, volume, onComplete);
-        });
-      }
-      return;
-    } catch (e) {
-      console.warn('Error al iniciar audio stream:', e);
-    }
-
-    // 2. Fallback SpeechSynthesis
-    this.playLocalSpeechOnce(text, volume, onComplete);
-  }
-
-  /**
-   * Fallback de síntesis de voz local con callback onComplete
-   */
-  static playLocalSpeechOnce(text, volume = 1.0, onComplete) {
     if (typeof window === 'undefined' || !window.speechSynthesis) {
       if (onComplete) onComplete();
       return;
@@ -173,17 +152,22 @@ class SoundService {
       window.speechSynthesis.cancel();
 
       const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 0.88;
+      utterance.rate = 0.90; // Velocidad natural y clara
       utterance.pitch = 1.0;
-      utterance.volume = volume;
+      utterance.volume = Math.min(1.0, Math.max(0.1, volume));
 
-      const voices = window.speechSynthesis.getVoices();
-      const spanish = voices.find(v => v.lang && (v.lang.startsWith('es') || v.lang.includes('Spanish')));
-      if (spanish) {
-        utterance.voice = spanish;
-        utterance.lang = spanish.lang;
+      if (this.cachedVoice) {
+        utterance.voice = this.cachedVoice;
+        utterance.lang = this.cachedVoice.lang;
       } else {
-        utterance.lang = 'es-ES';
+        const voices = window.speechSynthesis.getVoices();
+        const spanish = voices.find(v => v.lang && (v.lang.startsWith('es') || v.lang.includes('Spanish')));
+        if (spanish) {
+          utterance.voice = spanish;
+          utterance.lang = spanish.lang;
+        } else {
+          utterance.lang = 'es-ES';
+        }
       }
 
       let handled = false;
@@ -205,26 +189,37 @@ class SoundService {
   }
 
   /**
-   * Formatea el turno para pronunciación clara (ej: "A-001" -> "A, cero cero uno")
+   * Formatea el turno para pronunciación clara (ej: "A-001" -> "A, 0 0 1")
    */
   static formatTicketForSpeech(ticketNumber) {
     if (!ticketNumber) return '';
-    const parts = ticketNumber.split('-');
+    const parts = String(ticketNumber).split('-');
     if (parts.length === 2) {
       const letter = parts[0];
       const numbers = parts[1].split('').join(' ');
       return `${letter}, ${numbers}`;
     }
-    return ticketNumber.split('').join(' ');
+    return String(ticketNumber).split('').join(' ');
   }
 
   /**
-   * Llamado Completo Secuencial: Campana -> Voz 1 -> Pausa -> Campana -> Voz 2 (Sin solapamientos)
+   * Anuncio Secuencial Limpio: Campana -> Voz 1 -> Pausa -> Campana -> Voz 2 (Sin eco ni solapamientos)
    */
   static announceTicket({ ticketNumber, patientName, counterName, template, playSound = true, playVoice = true, volume = 1.0, repetitions = 2 }) {
+    // 1. Evitar llamadas duplicadas idénticas en menos de 1.2 segundos (Anti-eco)
+    const nowMs = Date.now();
+    const announceKey = `${ticketNumber}_${counterName}`;
+    if (this.lastAnnounceTicket === announceKey && (nowMs - this.lastAnnounceTime) < 1200) {
+      return;
+    }
+    this.lastAnnounceTicket = announceKey;
+    this.lastAnnounceTime = nowMs;
+
+    // 2. Detener cualquier sonido o locución anterior
     this.getAudioContext();
     this.stopAll();
 
+    // 3. Reproducir campana inicial
     if (playSound) {
       this.playChime(volume);
     }
@@ -233,7 +228,7 @@ class SoundService {
       const spokenTicket = this.formatTicketForSpeech(ticketNumber);
       const spokenCounter = counterName || 'su módulo de atención';
       const cleanPatient = patientName ? patientName.trim() : '';
-      
+
       let speechText = '';
       if (template) {
         speechText = template
@@ -246,17 +241,14 @@ class SoundService {
           : `Turno ${spokenTicket}, por favor pasar a ${spokenCounter}`;
       }
 
-      // Esperar 450ms a que termine el primer tono de la campana
-      setTimeout(() => {
-        // Primera Locución
+      // Esperar 450ms a que pase la campana inicial
+      this.safeTimeout(() => {
         this.playSpeechOnce(speechText, volume, () => {
-          // Callback que se ejecuta ÚNICAMENTE cuando la 1ra locución haya terminado
+          // Se ejecuta cuando termina la 1ra locución
           if (repetitions > 1) {
-            // Pausa agradable de 1.2 segundos entre el primer y el segundo llamado
-            setTimeout(() => {
+            this.safeTimeout(() => {
               if (playSound) this.playChime(volume * 0.85);
-              setTimeout(() => {
-                // Segunda Locución
+              this.safeTimeout(() => {
                 this.playSpeechOnce(speechText, volume);
               }, 400);
             }, 1200);
