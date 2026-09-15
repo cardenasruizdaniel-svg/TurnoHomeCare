@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  deaturnos:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: deaturnos_app
+    restart: always
+    ports:
+      - "5000:5000"
+    environment:
+      - NODE_ENV=production
+      - PORT=5000
+      - DB_PATH=/app/backend/data/deaturnos.db
+    volumes:
+      - deaturnos_data:/app/backend/data
+
+  # Opcional: Túnel Cloudflare para acceso externo seguro y gratuito con HTTPS
+  # Descomentar si desea acceso remoto automatizado sin abrir puertos en el router:
+  # cloudflared:
+  #   image: cloudflare/cloudflared:latest
+  #   container_name: deaturnos_tunnel
+  #   restart: always
+  #   command: tunnel --no-autoupdate run --token TU_TOKEN_CLOUDFLARE
+
+volumes:
+  deaturnos_data:

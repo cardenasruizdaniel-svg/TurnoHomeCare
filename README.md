@@ -97,7 +97,26 @@ npm run dev
 
 Esto levantará concurrentemente:
 - **Backend API & WebSockets**: `http://localhost:5000`
-- **Frontend Web Application**: `http://localhost:5173`
+### 🐧 Despliegue Automatizado en Servidor Linux (Ubuntu, Debian, CentOS, etc.)
+
+El proyecto incluye scripts optimizados para instalación en 1 solo paso en servidores Linux:
+
+```bash
+# Dar permisos de ejecución e iniciar instalador limpio
+sudo chmod +x install_linux.sh setup_tunnel_linux.sh
+sudo bash install_linux.sh
+```
+
+- **Acceso Remoto desde Afuera de la Red (Internet)**:
+  Para activar el túnel seguro HTTPS sin abrir puertos en el router:
+  ```bash
+  sudo bash setup_tunnel_linux.sh
+  ```
+- **Despliegue con Docker Compose**:
+  ```bash
+  docker compose up -d
+  ```
+- Consulte la [Guía Completa de Instalación en Linux](MANUAL_INSTALACION_LINUX.md) para más detalles.
 
 ---
 

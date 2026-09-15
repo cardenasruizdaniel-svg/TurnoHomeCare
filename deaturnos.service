@@ -1,0 +1,19 @@
+[Unit]
+Description=DEATurnos - Sistema de Gestión de Turnos Inteligente
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/deaturnos
+ExecStart=/usr/bin/node /opt/deaturnos/backend/src/server.js
+Restart=always
+RestartSec=5
+Environment=NODE_ENV=production
+Environment=PORT=5000
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=deaturnos
+
+[Install]
+WantedBy=multi-user.target
