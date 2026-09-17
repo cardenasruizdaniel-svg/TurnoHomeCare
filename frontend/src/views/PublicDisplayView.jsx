@@ -445,11 +445,11 @@ export function PublicDisplayView() {
           </div>
         </div>
 
-        {/* ÁREA DERECHA: Banner Multimedia Rotativo (50%) & Código QR (50%) */}
-        <div className="col-span-12 lg:col-span-5 h-full flex flex-col gap-4 justify-between">
+        {/* ÁREA DERECHA: Banner Multimedia Rotativo (Mayor Tamaño) & Código QR (Más Compacto) */}
+        <div className="col-span-12 lg:col-span-5 h-full flex flex-col gap-3 justify-between">
           
-          {/* 1. Carrusel Publicitario */}
-          <div className={`rounded-3xl border-2 p-5 shadow-2xl flex-1 flex flex-col justify-between relative overflow-hidden ${
+          {/* 1. Carrusel Publicitario (MÁS GRANDE: flex-[1.8]) */}
+          <div className={`rounded-3xl border-2 p-5 shadow-2xl flex-[1.8] flex flex-col justify-between relative overflow-hidden ${
             d ? 'bg-slate-900/95 border-pink-500/30' : 'bg-white border-pink-200'
           }`}>
             
@@ -469,8 +469,8 @@ export function PublicDisplayView() {
               )}
             </div>
 
-            <div className="my-auto grid grid-cols-12 gap-3 items-center">
-              <div className={`col-span-5 h-28 sm:h-32 rounded-2xl overflow-hidden relative border shadow-md ${
+            <div className="my-auto grid grid-cols-12 gap-4 items-center py-2">
+              <div className={`col-span-5 h-36 sm:h-44 rounded-2xl overflow-hidden relative border shadow-md ${
                 d ? 'bg-slate-950 border-slate-800' : 'bg-slate-100 border-slate-200'
               }`}>
                 {currentBanner?.imageUrl ? (
@@ -487,18 +487,18 @@ export function PublicDisplayView() {
                 )}
               </div>
 
-              <div className="col-span-7 space-y-1.5 pl-1">
-                <h3 className={`text-base sm:text-lg font-black font-display leading-tight ${d ? 'text-white' : 'text-slate-900'}`}>
+              <div className="col-span-7 space-y-2 pl-1">
+                <h3 className={`text-lg sm:text-xl font-black font-display leading-tight ${d ? 'text-white' : 'text-slate-900'}`}>
                   {currentBanner?.title}
                 </h3>
-                <p className={`text-xs line-clamp-3 leading-relaxed ${d ? 'text-slate-300' : 'text-slate-600'}`}>
+                <p className={`text-xs sm:text-sm line-clamp-4 leading-relaxed ${d ? 'text-slate-300' : 'text-slate-600'}`}>
                   {currentBanner?.subtitle}
                 </p>
               </div>
             </div>
 
-            <div className={`flex items-center justify-between pt-1 border-t ${d ? 'border-slate-800/80 text-slate-400' : 'border-slate-200 text-slate-500'}`}>
-              <span className="text-[10px] font-semibold">
+            <div className={`flex items-center justify-between pt-1.5 border-t ${d ? 'border-slate-800/80 text-slate-400' : 'border-slate-200 text-slate-500'}`}>
+              <span className="text-[11px] font-semibold">
                 HomeCare del Quindío I.P.S.
               </span>
               {banners.length > 1 && (
@@ -517,34 +517,31 @@ export function PublicDisplayView() {
 
           </div>
 
-          {/* 2. Código QR */}
-          <div className={`rounded-3xl border-2 p-5 shadow-2xl flex-1 flex flex-col justify-between items-center text-center relative overflow-hidden ${
+          {/* 2. Código QR (MÁS PEQUEÑO Y COMPACTO: flex-1) */}
+          <div className={`rounded-3xl border-2 p-3.5 shadow-2xl flex-1 flex flex-col justify-between items-center text-center relative overflow-hidden ${
             d ? 'bg-slate-900/95 border-purple-500/30' : 'bg-white border-purple-200'
           }`}>
             
             <div className="space-y-0.5">
-              <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-purple-500/15 text-purple-500 border border-purple-500/30 text-[11px] font-black uppercase tracking-wider">
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-purple-500/15 text-purple-500 border border-purple-500/30 text-[10px] font-black uppercase tracking-wider">
                 📱 SOLICITUD MÓVIL (4G / 5G / Wi-Fi)
               </span>
-              <h2 className={`text-lg sm:text-xl font-black font-display tracking-tight ${d ? 'text-white' : 'text-slate-900'}`}>OBTÉN TU TURNO AQUÍ</h2>
-              <p className={`text-xs ${d ? 'text-slate-300' : 'text-slate-600'}`}>
-                Apunta con la cámara de tu celular para solicitar tu turno digital
-              </p>
+              <h2 className={`text-sm sm:text-base font-black font-display tracking-tight ${d ? 'text-white' : 'text-slate-900'}`}>OBTÉN TU TURNO AQUÍ</h2>
             </div>
 
-            <div className={`my-auto p-3.5 rounded-3xl bg-white shadow-2xl shadow-purple-500/20 border-4 hover:scale-105 transition-transform duration-300 flex items-center justify-center ${
+            <div className={`my-1 p-2 rounded-2xl bg-white shadow-lg border-2 hover:scale-105 transition-transform duration-300 flex items-center justify-center ${
               d ? 'border-slate-800' : 'border-slate-200'
             }`}>
               <QRCodeSVG
                 value={publicRequestUrl}
-                size={155}
+                size={110}
                 level="H"
                 includeMargin={false}
               />
             </div>
 
             <div className="w-full">
-              <div className={`flex items-center justify-center gap-2 text-xs font-bold py-1.5 px-3 rounded-xl border ${
+              <div className={`flex items-center justify-center gap-1.5 text-[11px] font-bold py-1 px-2.5 rounded-xl border ${
                 d ? 'text-teal-300 bg-teal-500/10 border-teal-500/20' : 'text-teal-800 bg-teal-50 border-teal-200'
               }`}>
                 <span>1. Escanea QR</span>

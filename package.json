@@ -10,6 +10,7 @@
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
     "build": "cd backend && npm install && cd ../frontend && npm install && npm run build",
     "start": "node backend/src/server.js",
+    "update": "node backend/src/updater.js",
     "seed": "cd backend && npm run seed",
     "test": "cd backend && npm test"
   },

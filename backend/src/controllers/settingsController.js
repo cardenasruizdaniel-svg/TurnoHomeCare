@@ -149,6 +149,20 @@ class SettingsController {
       res.status(500).json({ success: false, error: err.message });
     }
   }
+
+  static async applySystemUpdate(req, res) {
+    try {
+      const runUpdater = require('../updater');
+      await runUpdater();
+      res.json({
+        success: true,
+        message: 'Actualización del sistema aplicada exitosamente. Todos los registros y configuraciones fueron conservados.'
+      });
+    } catch (err) {
+      console.error('Error aplicando actualización desde panel:', err);
+      res.status(500).json({ success: false, error: err.message });
+    }
+  }
 }
 
 module.exports = SettingsController;
