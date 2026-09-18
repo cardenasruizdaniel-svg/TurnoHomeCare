@@ -237,7 +237,22 @@ export function PublicDisplayView() {
     localStorage.setItem('deaturnos_audio_enabled', 'true');
   };
 
-  const d = isDark;
+  const isVideoUrl = (url, mediaType) => {
+    if (mediaType === 'video') return true;
+    if (!url || typeof url !== 'string') return false;
+    const lower = url.toLowerCase();
+    return (
+      lower.startsWith('data:video/') ||
+      lower.endsWith('.mp4') ||
+      lower.endsWith('.webm') ||
+      lower.endsWith('.ogg') ||
+      lower.endsWith('.mov') ||
+      lower.includes('/video/')
+    );
+  };
+
+  const hasVideo = isVideoUrl(currentBanner?.videoUrl || currentBanner?.imageUrl, currentBanner?.mediaType);
+  const bannerMediaSrc = currentBanner?.videoUrl || currentBanner?.imageUrl;
 
   return (
     <div 
@@ -473,7 +488,17 @@ export function PublicDisplayView() {
               <div className={`col-span-5 h-36 sm:h-44 rounded-2xl overflow-hidden relative border shadow-md ${
                 d ? 'bg-slate-950 border-slate-800' : 'bg-slate-100 border-slate-200'
               }`}>
-                {currentBanner?.imageUrl ? (
+                {hasVideo ? (
+                  <video
+                    src={bannerMediaSrc}
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    controls={false}
+                    className="w-full h-full object-cover transition-transform duration-700"
+                  />
+                ) : currentBanner?.imageUrl ? (
                   <img
                     src={currentBanner.imageUrl}
                     alt={currentBanner.title}

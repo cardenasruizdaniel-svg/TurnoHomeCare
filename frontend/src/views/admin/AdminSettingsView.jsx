@@ -23,7 +23,9 @@ import {
   Database,
   Download,
   HardDrive,
-  ShieldCheck
+  ShieldCheck,
+  Video,
+  Film
 } from 'lucide-react';
 import { api } from '../../services/api';
 import { useTheme } from '../../context/ThemeContext';
@@ -426,16 +428,54 @@ export function AdminSettingsView() {
     });
   };
 
+  const processVideoFile = (file) => {
+    return new Promise((resolve, reject) => {
+      if (!file || !file.type.startsWith('video/')) {
+        return reject(new Error('El archivo seleccionado no es un video válido (debe ser .mp4, .webm o .ogg).'));
+      }
+      if (file.size > 50 * 1024 * 1024) {
+        return reject(new Error('El archivo de video supera el límite de 50 MB.'));
+      }
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target.result);
+      reader.onerror = () => reject(new Error('Error al procesar el archivo de video.'));
+      reader.readAsDataURL(file);
+    });
+  };
+
   const handleBannerFileSelect = async (idx, e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     try {
       setSaving(true);
-      const dataUrl = await processImageFile(file, 1200, 0.85);
-      handleBannerChange(idx, 'imageUrl', dataUrl);
-      setSuccessMsg(`Imagen para Slide #${idx + 1} cargada con éxito.`);
+      if (file.type.startsWith('video/')) {
+        const dataUrl = await processVideoFile(file);
+        const currentBanners = Array.isArray(settings.BANNERS_PUBLICIDAD) ? [...settings.BANNERS_PUBLICIDAD] : [];
+        if (currentBanners[idx]) {
+          currentBanners[idx] = {
+            ...currentBanners[idx],
+            mediaType: 'video',
+            videoUrl: dataUrl,
+            imageUrl: dataUrl
+          };
+          setSettings(prev => ({ ...prev, BANNERS_PUBLICIDAD: currentBanners }));
+        }
+        setSuccessMsg(`Video publicitario para Slide #${idx + 1} cargado con éxito.`);
+      } else {
+        const dataUrl = await processImageFile(file, 1200, 0.85);
+        const currentBanners = Array.isArray(settings.BANNERS_PUBLICIDAD) ? [...settings.BANNERS_PUBLICIDAD] : [];
+        if (currentBanners[idx]) {
+          currentBanners[idx] = {
+            ...currentBanners[idx],
+            mediaType: 'image',
+            imageUrl: dataUrl
+          };
+          setSettings(prev => ({ ...prev, BANNERS_PUBLICIDAD: currentBanners }));
+        }
+        setSuccessMsg(`Imagen para Slide #${idx + 1} cargada con éxito.`);
+      }
     } catch (err) {
-      setErrorMsg(err.message || 'Error al procesar archivo de imagen.');
+      setErrorMsg(err.message || 'Error al procesar el archivo.');
     } finally {
       setSaving(false);
       e.target.value = '';
@@ -820,35 +860,67 @@ export function AdminSettingsView() {
                       </div>
                     </div>
 
-                    {/* Image Preview & File Upload */}
+                    {/* Media Preview (Foto o Video) & File Upload */}
                     <div className="h-32 rounded-xl bg-slate-900 border border-slate-800 overflow-hidden relative group/img">
-                      {b.imageUrl ? (
+                      {(b.mediaType === 'video' || (b.videoUrl && (b.videoUrl.endsWith('.mp4') || b.videoUrl.endsWith('.webm') || b.videoUrl.startsWith('data:video/'))) || (b.imageUrl && (b.imageUrl.endsWith('.mp4') || b.imageUrl.endsWith('.webm') || b.imageUrl.startsWith('data:video/')))) ? (
+                        <video
+                          src={b.videoUrl || b.imageUrl}
+                          controls
+                          muted
+                          playsInline
+                          className="w-full h-full object-cover"
+                        />
+                      ) : b.imageUrl ? (
                         <img src={b.imageUrl} alt={b.title} className="w-full h-full object-cover" />
                       ) : (
                         <div className="w-full h-full flex flex-col items-center justify-center text-slate-500 text-xs gap-1">
-                          <Image className="w-6 h-6 text-slate-600" />
-                          <span>Sin foto asignada</span>
+                          <Film className="w-6 h-6 text-slate-600" />
+                          <span>Sin foto ni video asignado</span>
                         </div>
                       )}
 
-                      {/* Botón Flotante para Cambiar Foto */}
-                      <div className="absolute inset-0 bg-slate-950/70 opacity-0 group-hover/img:opacity-100 flex items-center justify-center gap-2 transition">
+                      {/* Botón Flotante para Cambiar Archivo */}
+                      <div className="absolute inset-0 bg-slate-950/70 opacity-0 group-hover/img:opacity-100 flex items-center justify-center gap-2 transition pointer-events-auto">
                         <button
                           type="button"
                           onClick={() => document.getElementById(`banner-file-${idx}`)?.click()}
                           className="px-3 py-1.5 rounded-lg bg-pink-600 hover:bg-pink-500 text-white text-xs font-bold shadow-lg flex items-center gap-1 cursor-pointer"
                         >
                           <Upload className="w-3.5 h-3.5" />
-                          <span>Cambiar Foto</span>
+                          <span>Cambiar Archivo</span>
                         </button>
                       </div>
+                    </div>
+
+                    {/* Selector de Tipo de Multimedia */}
+                    <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-900 border border-slate-800 text-[11px]">
+                      <button
+                        type="button"
+                        onClick={() => handleBannerChange(idx, 'mediaType', 'image')}
+                        className={`flex-1 py-1 rounded-lg font-bold transition flex items-center justify-center gap-1 ${
+                          (b.mediaType || 'image') === 'image' ? 'bg-pink-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        <Image className="w-3 h-3" />
+                        <span>Foto</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleBannerChange(idx, 'mediaType', 'video')}
+                        className={`flex-1 py-1 rounded-lg font-bold transition flex items-center justify-center gap-1 ${
+                          b.mediaType === 'video' ? 'bg-purple-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        <Video className="w-3 h-3" />
+                        <span>Video MP4</span>
+                      </button>
                     </div>
 
                     {/* Selector de Archivo Oculto */}
                     <input
                       type="file"
                       id={`banner-file-${idx}`}
-                      accept="image/*"
+                      accept="image/*,video/*"
                       className="hidden"
                       onChange={(e) => handleBannerFileSelect(idx, e)}
                     />
@@ -861,14 +933,17 @@ export function AdminSettingsView() {
                         className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-pink-600/20 hover:bg-pink-600/30 border border-pink-500/40 text-pink-300 font-bold text-xs transition cursor-pointer"
                       >
                         <Upload className="w-3.5 h-3.5" />
-                        <span>📁 Subir Foto desde mi Equipo</span>
+                        <span>📁 Subir Foto o Video (.mp4)</span>
                       </button>
-                      {b.imageUrl && (
+                      {(b.imageUrl || b.videoUrl) && (
                         <button
                           type="button"
-                          onClick={() => handleBannerChange(idx, 'imageUrl', '')}
+                          onClick={() => {
+                            handleBannerChange(idx, 'imageUrl', '');
+                            handleBannerChange(idx, 'videoUrl', '');
+                          }}
                           className="p-2 rounded-xl bg-slate-900 hover:bg-rose-950/50 border border-slate-700 text-slate-400 hover:text-rose-400 text-xs transition"
-                          title="Quitar foto"
+                          title="Quitar multimedia"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -910,12 +985,23 @@ export function AdminSettingsView() {
                       </div>
 
                       <div>
-                        <label className="text-[10px] text-slate-500 font-bold block">O ingresar URL de Imagen</label>
+                        <label className="text-[10px] text-slate-500 font-bold block">
+                          URL de Imagen o Video (.mp4 / .webm)
+                        </label>
                         <input
                           type="text"
-                          placeholder="https://... o archivo cargado"
-                          value={b.imageUrl || ''}
-                          onChange={(e) => handleBannerChange(idx, 'imageUrl', e.target.value)}
+                          placeholder="https://... o /banners/promocion.mp4"
+                          value={b.videoUrl || b.imageUrl || ''}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val.endsWith('.mp4') || val.endsWith('.webm') || val.endsWith('.ogg')) {
+                              handleBannerChange(idx, 'mediaType', 'video');
+                              handleBannerChange(idx, 'videoUrl', val);
+                              handleBannerChange(idx, 'imageUrl', val);
+                            } else {
+                              handleBannerChange(idx, 'imageUrl', val);
+                            }
+                          }}
                           className="w-full p-1.5 rounded-lg bg-slate-900 border border-slate-700 text-sky-400 font-mono text-[11px]"
                         />
                       </div>
