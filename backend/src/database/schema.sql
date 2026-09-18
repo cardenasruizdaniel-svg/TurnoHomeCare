@@ -38,8 +38,9 @@ CREATE TABLE IF NOT EXISTS branches (
 -- 3. Roles del Sistema
 CREATE TABLE IF NOT EXISTS roles (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL UNIQUE, -- 'ADMIN', 'SUPERVISOR', 'FUNCIONARIO'
-    description TEXT
+    name TEXT NOT NULL UNIQUE, -- 'ADMIN', 'SUPERVISOR', 'FUNCIONARIO', etc.
+    description TEXT,
+    permissions TEXT
 );
 
 -- 4. Usuarios / Funcionarios

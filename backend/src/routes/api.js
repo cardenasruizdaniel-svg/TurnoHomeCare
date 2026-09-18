@@ -105,6 +105,9 @@ router.delete('/branches/:id', authenticateToken, requireRole(['ADMIN']), Branch
 // Usuarios y Roles
 router.get('/users', authenticateToken, requireRole(['ADMIN', 'SUPERVISOR']), UserController.getAll);
 router.get('/roles', authenticateToken, requireRole(['ADMIN']), UserController.getRoles);
+router.post('/roles', authenticateToken, requireRole(['ADMIN']), UserController.createRole);
+router.put('/roles/:id', authenticateToken, requireRole(['ADMIN']), UserController.updateRole);
+router.delete('/roles/:id', authenticateToken, requireRole(['ADMIN']), UserController.deleteRole);
 router.post('/users', authenticateToken, requireRole(['ADMIN']), UserController.create);
 router.put('/users/:id', authenticateToken, requireRole(['ADMIN']), UserController.update);
 router.patch('/users/:id/toggle', authenticateToken, requireRole(['ADMIN']), UserController.toggleActive);

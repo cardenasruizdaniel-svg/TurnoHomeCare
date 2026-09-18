@@ -23,23 +23,25 @@ import { useBranding } from '../context/BrandingContext';
 import { useTheme } from '../context/ThemeContext';
 
 export function Sidebar() {
-  const { user, logout } = useAuth();
+  const { user, logout, hasPermission } = useAuth();
   const { company } = useBranding();
   const { isDark, toggleTheme } = useTheme();
   const navigate = useNavigate();
 
-  const navItems = [
-    { to: '/admin/dashboard',     label: 'Dashboard',              icon: LayoutDashboard },
-    { to: '/admin/programacion',  label: 'Programación de Turnos', icon: Calendar },
-    { to: '/admin/turnos',        label: 'Historial de Turnos',     icon: Ticket },
-    { to: '/admin/servicios',     label: 'Servicios Médicos',       icon: Stethoscope },
-    { to: '/admin/modulos',       label: 'Módulos / Consultorios',  icon: Grid3X3 },
-    { to: '/admin/sedes',         label: 'Sedes y Códigos QR',      icon: Building2 },
-    { to: '/admin/usuarios',      label: 'Usuarios y Roles',        icon: Users },
-    { to: '/admin/configuracion', label: 'Configuración Global',    icon: Settings },
-    { to: '/admin/reportes',      label: 'Reportes y Analítica',    icon: FileText },
-    { to: '/admin/auditoria',     label: 'Auditoría del Sistema',   icon: History },
+  const allNavItems = [
+    { to: '/admin/dashboard',     label: 'Dashboard',              icon: LayoutDashboard, permission: 'dashboard' },
+    { to: '/admin/programacion',  label: 'Programación de Turnos', icon: Calendar,        permission: 'schedule' },
+    { to: '/admin/turnos',        label: 'Historial de Turnos',     icon: Ticket,          permission: 'history_tickets' },
+    { to: '/admin/servicios',     label: 'Servicios Médicos',       icon: Stethoscope,     permission: 'services' },
+    { to: '/admin/modulos',       label: 'Módulos / Consultorios',  icon: Grid3X3,         permission: 'counters' },
+    { to: '/admin/sedes',         label: 'Sedes y Códigos QR',      icon: Building2,       permission: 'branches' },
+    { to: '/admin/usuarios',      label: 'Usuarios y Roles',        icon: Users,           permission: 'users' },
+    { to: '/admin/configuracion', label: 'Configuración Global',    icon: Settings,        permission: 'settings' },
+    { to: '/admin/reportes',      label: 'Reportes y Analítica',    icon: FileText,        permission: 'reports' },
+    { to: '/admin/auditoria',     label: 'Auditoría del Sistema',   icon: History,         permission: 'audit' },
   ];
+
+  const navItems = allNavItems.filter(item => hasPermission(item.permission));
 
   const handleLogout = () => {
     logout();

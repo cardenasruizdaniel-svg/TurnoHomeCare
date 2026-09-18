@@ -54,8 +54,23 @@ export function AuthProvider({ children }) {
   const isSupervisor = user?.role === 'SUPERVISOR' || user?.role === 'ADMIN';
   const isFuncionario = user?.role === 'FUNCIONARIO' || isSupervisor;
 
+  const hasPermission = (permissionKey) => {
+    if (!user) return false;
+    if (user.role === 'ADMIN') return true;
+    if (Array.isArray(user.permissions)) {
+      return user.permissions.includes(permissionKey);
+    }
+    if (user.role === 'SUPERVISOR') {
+      return ['dashboard', 'attention', 'history_tickets', 'schedule', 'services', 'counters', 'reports'].includes(permissionKey);
+    }
+    if (user.role === 'FUNCIONARIO') {
+      return ['attention', 'history_tickets', 'schedule'].includes(permissionKey);
+    }
+    return false;
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, isAdmin, isSupervisor, isFuncionario }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, isAdmin, isSupervisor, isFuncionario, hasPermission }}>
       {children}
     </AuthContext.Provider>
   );
@@ -71,7 +86,8 @@ export function useAuth() {
       logout: () => {},
       isAdmin: false,
       isSupervisor: false,
-      isFuncionario: false
+      isFuncionario: false,
+      hasPermission: () => false
     };
   }
   return context;

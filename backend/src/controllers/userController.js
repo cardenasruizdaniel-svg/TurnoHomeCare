@@ -24,7 +24,134 @@ class UserController {
   static async getRoles(req, res) {
     try {
       const roles = await db.prepare('SELECT * FROM roles ORDER BY id ASC').all();
-      res.json({ success: true, roles });
+      const defaultAll = ["dashboard", "attention", "history_tickets", "schedule", "services", "counters", "branches", "users", "settings", "audit", "reports"];
+
+      const parsedRoles = roles.map(r => {
+        let perms = [];
+        if (r.name === 'ADMIN') {
+          perms = defaultAll;
+        } else if (r.permissions) {
+          try {
+            perms = JSON.parse(r.permissions);
+          } catch {
+            perms = r.permissions.split(',').map(p => p.trim());
+          }
+        }
+        return {
+          ...r,
+          permissions: Array.isArray(perms) ? perms : []
+        };
+      });
+
+      res.json({ success: true, roles: parsedRoles });
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
+  static async createRole(req, res) {
+    try {
+      const { name, description, permissions } = req.body;
+      if (!name || !name.trim()) {
+        return res.status(400).json({ success: false, error: 'NOMBRE_REQUERIDO', message: 'El nombre del rol es obligatorio' });
+      }
+
+      const roleName = name.trim().toUpperCase();
+      const existing = await db.prepare('SELECT id FROM roles WHERE UPPER(name) = ?').get(roleName);
+      if (existing) {
+        return res.status(400).json({ success: false, error: 'ROL_DUPLICADO', message: 'Ya existe un rol con ese nombre' });
+      }
+
+      const permsJson = JSON.stringify(Array.isArray(permissions) ? permissions : []);
+      const result = await db.prepare(`
+        INSERT INTO roles (name, description, permissions)
+        VALUES (?, ?, ?)
+      `).run(roleName, description ? description.trim() : '', permsJson);
+
+      await AuditService.log({
+        userId: req.user.id,
+        action: 'CREATE_ROLE',
+        entity: 'ROLE',
+        entityId: result.lastInsertRowid,
+        details: { name: roleName, permissions }
+      });
+
+      res.status(201).json({ success: true, id: result.lastInsertRowid, message: `Rol ${roleName} creado exitosamente` });
+    } catch (err) {
+      res.status(400).json({ success: false, error: err.message });
+    }
+  }
+
+  static async updateRole(req, res) {
+    try {
+      const { id } = req.params;
+      const roleId = Number(id);
+      const { name, description, permissions } = req.body;
+
+      const role = await db.prepare('SELECT * FROM roles WHERE id = ?').get(roleId);
+      if (!role) {
+        return res.status(404).json({ success: false, error: 'ROL_NO_ENCONTRADO' });
+      }
+
+      const newName = name ? name.trim().toUpperCase() : role.name;
+      const permsJson = permissions !== undefined ? JSON.stringify(Array.isArray(permissions) ? permissions : []) : role.permissions;
+
+      await db.prepare(`
+        UPDATE roles
+        SET name = ?,
+            description = COALESCE(?, description),
+            permissions = ?
+        WHERE id = ?
+      `).run(newName, description !== undefined ? description.trim() : null, permsJson, roleId);
+
+      await AuditService.log({
+        userId: req.user.id,
+        action: 'UPDATE_ROLE',
+        entity: 'ROLE',
+        entityId: roleId,
+        details: { name: newName, permissions }
+      });
+
+      res.json({ success: true, message: `Rol ${newName} actualizado exitosamente` });
+    } catch (err) {
+      res.status(400).json({ success: false, error: err.message });
+    }
+  }
+
+  static async deleteRole(req, res) {
+    try {
+      const { id } = req.params;
+      const roleId = Number(id);
+
+      const role = await db.prepare('SELECT * FROM roles WHERE id = ?').get(roleId);
+      if (!role) {
+        return res.status(404).json({ success: false, error: 'ROL_NO_ENCONTRADO' });
+      }
+
+      if (role.name === 'ADMIN') {
+        return res.status(400).json({ success: false, error: 'ROL_PROTEGIDO', message: 'El rol Administrador Principal no se puede eliminar' });
+      }
+
+      const usersCount = await db.prepare('SELECT COUNT(*) as count FROM users WHERE role_id = ?').get(roleId)?.count || 0;
+      if (usersCount > 0) {
+        return res.status(400).json({
+          success: false,
+          error: 'ROL_CON_USUARIOS',
+          message: `No se puede eliminar el rol ${role.name} porque hay ${usersCount} usuario(s) asignado(s) a él. Reasigne los usuarios antes de borrarlo.`
+        });
+      }
+
+      await db.prepare('DELETE FROM roles WHERE id = ?').run(roleId);
+
+      await AuditService.log({
+        userId: req.user.id,
+        action: 'DELETE_ROLE',
+        entity: 'ROLE',
+        entityId: roleId,
+        details: { name: role.name }
+      });
+
+      res.json({ success: true, message: `Rol ${role.name} eliminado exitosamente` });
     } catch (err) {
       res.status(500).json({ success: false, error: err.message });
     }

@@ -6,18 +6,24 @@ import { useTheme } from '../../context/ThemeContext';
 import { LoadingSpinner } from '../../components/Modal';
 
 export function AdminLayout() {
-  const { user, loading, isSupervisor } = useAuth();
+  const { user, loading, hasPermission } = useAuth();
   const { isDark } = useTheme();
 
   if (loading) {
     return (
       <div className={`min-h-screen flex items-center justify-center ${isDark ? 'bg-slate-950' : 'bg-slate-100'}`}>
-        <LoadingSpinner text="Verificando permisos..." />
+        <LoadingSpinner text="Verificando permisos de acceso..." />
       </div>
     );
   }
 
-  if (!user || !isSupervisor) {
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  // Verificar si el usuario tiene al menos 1 permiso administrativo o de atención
+  const hasAnyAccess = user.role === 'ADMIN' || (Array.isArray(user.permissions) && user.permissions.length > 0) || user.role === 'SUPERVISOR' || user.role === 'FUNCIONARIO';
+  if (!hasAnyAccess) {
     return <Navigate to="/login" replace />;
   }
 

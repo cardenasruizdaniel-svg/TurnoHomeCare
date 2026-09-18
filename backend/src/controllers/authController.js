@@ -14,7 +14,7 @@ class AuthController {
       }
 
       const user = await db.prepare(`
-        SELECT u.*, r.name as role_name, b.name as branch_name
+        SELECT u.*, r.name as role_name, r.permissions as role_permissions, b.name as branch_name
         FROM users u
         JOIN roles r ON u.role_id = r.id
         LEFT JOIN branches b ON u.branch_id = b.id
@@ -33,11 +33,24 @@ class AuthController {
       // Actualizar último login
       await db.prepare('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?').run(user.id);
 
+      const defaultAll = ["dashboard", "attention", "history_tickets", "schedule", "services", "counters", "branches", "users", "settings", "audit", "reports"];
+      let permissions = [];
+      if (user.role_name === 'ADMIN') {
+        permissions = defaultAll;
+      } else if (user.role_permissions) {
+        try {
+          permissions = JSON.parse(user.role_permissions);
+        } catch {
+          permissions = user.role_permissions.split(',').map(p => p.trim());
+        }
+      }
+
       const tokenPayload = {
         id: user.id,
         username: user.username,
         full_name: user.full_name,
         role: user.role_name,
+        permissions,
         branch_id: user.branch_id
       };
 
@@ -61,6 +74,7 @@ class AuthController {
           full_name: user.full_name,
           email: user.email,
           role: user.role_name,
+          permissions,
           branch_id: user.branch_id,
           branch_name: user.branch_name
         }
@@ -74,7 +88,7 @@ class AuthController {
   static async getMe(req, res) {
     try {
       const user = await db.prepare(`
-        SELECT u.id, u.username, u.full_name, u.email, u.branch_id, r.name as role_name, b.name as branch_name
+        SELECT u.id, u.username, u.full_name, u.email, u.branch_id, r.name as role_name, r.permissions as role_permissions, b.name as branch_name
         FROM users u
         JOIN roles r ON u.role_id = r.id
         LEFT JOIN branches b ON u.branch_id = b.id
@@ -85,6 +99,18 @@ class AuthController {
         return res.status(404).json({ success: false, error: 'USUARIO_NO_ENCONTRADO' });
       }
 
+      const defaultAll = ["dashboard", "attention", "history_tickets", "schedule", "services", "counters", "branches", "users", "settings", "audit", "reports"];
+      let permissions = [];
+      if (user.role_name === 'ADMIN') {
+        permissions = defaultAll;
+      } else if (user.role_permissions) {
+        try {
+          permissions = JSON.parse(user.role_permissions);
+        } catch {
+          permissions = user.role_permissions.split(',').map(p => p.trim());
+        }
+      }
+
       res.json({
         success: true,
         user: {
@@ -93,6 +119,7 @@ class AuthController {
           full_name: user.full_name,
           email: user.email,
           role: user.role_name,
+          permissions,
           branch_id: user.branch_id,
           branch_name: user.branch_name
         }

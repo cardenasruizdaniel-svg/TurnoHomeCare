@@ -142,5 +142,10 @@ export const api = {
   getSchedule: (params) => request(`/schedule${buildQueryString(params)}`),
   createSchedule: (payload) => request('/schedule', { method: 'POST', body: JSON.stringify(payload) }),
   editUncalledTicket: (id, payload) => request(`/tickets/${id}/edit-uncalled`, { method: 'PUT', body: JSON.stringify(payload) }),
-  cancelUncalledTicket: (id, reason) => request(`/tickets/${id}/cancel-uncalled`, { method: 'POST', body: JSON.stringify({ reason }) })
+  cancelUncalledTicket: (id, reason) => request(`/tickets/${id}/cancel-uncalled`, { method: 'POST', body: JSON.stringify({ reason }) }),
+
+  // Gestión de Roles y Permisos Dinámicos
+  createRole: (data) => request('/roles', { method: 'POST', body: JSON.stringify(data) }),
+  updateRole: (id, data) => request(`/roles/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteRole: (id) => request(`/roles/${id}`, { method: 'DELETE' })
 };
