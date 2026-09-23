@@ -16,5 +16,7 @@ backend/.env
 Thumbs.db
 .system_generated/
 
-# Database files (ignored by default except initial directory)
-# data/*.db
+# Database files
+backend/data/*.db
+backend/data/*.sqlite
+backend/data/backups/

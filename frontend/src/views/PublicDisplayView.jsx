@@ -202,21 +202,32 @@ export function PublicDisplayView() {
     ? `${window.location.origin}/solicitar-turno?branchId=${branchId}`
     : (displayData?.public_request_url || `${window.location.origin}/solicitar-turno?branchId=${branchId}`);
   
-  const rawBanners = displayData?.settings?.BANNERS_PUBLICIDAD?.value || displayData?.settings?.BANNERS_PUBLICIDAD;
+  const rawBanners = displayData?.settings?.BANNERS_PUBLICIDAD?.value !== undefined 
+    ? displayData.settings.BANNERS_PUBLICIDAD.value 
+    : displayData?.settings?.BANNERS_PUBLICIDAD;
+
   const banners = React.useMemo(() => {
     let list = [];
-    if (Array.isArray(rawBanners)) list = rawBanners;
-    else if (typeof rawBanners === 'string') {
+    if (Array.isArray(rawBanners)) {
+      list = rawBanners;
+    } else if (typeof rawBanners === 'string' && rawBanners.trim().length > 0) {
       try { list = JSON.parse(rawBanners); } catch { list = []; }
     }
-    const filtered = list.filter(b => b && typeof b === 'object' && b.isActive !== false).map(b => ({
-      ...b,
-      title: typeof b.title === 'string' ? b.title : '',
-      subtitle: typeof b.subtitle === 'string' ? b.subtitle : '',
-      tag: typeof b.tag === 'string' ? b.tag : '',
-      imageUrl: typeof b.imageUrl === 'string' ? b.imageUrl : '',
-      videoUrl: typeof b.videoUrl === 'string' ? b.videoUrl : ''
-    }));
+
+    const filtered = list.filter(b => b && typeof b === 'object' && b.isActive !== false).map(b => {
+      const srcUrl = typeof b.imageUrl === 'string' && b.imageUrl ? b.imageUrl : (typeof b.videoUrl === 'string' ? b.videoUrl : '');
+      const isVid = typeof b.mediaType === 'string' && b.mediaType === 'video' || (typeof srcUrl === 'string' && (srcUrl.includes('.mp4') || srcUrl.includes('.webm') || srcUrl.includes('.ogg') || srcUrl.startsWith('data:video/')));
+      return {
+        ...b,
+        title: typeof b.title === 'string' ? b.title : '',
+        subtitle: typeof b.subtitle === 'string' ? b.subtitle : '',
+        tag: typeof b.tag === 'string' ? b.tag : '',
+        mediaType: isVid ? 'video' : 'image',
+        imageUrl: isVid ? '' : srcUrl,
+        videoUrl: isVid ? srcUrl : (typeof b.videoUrl === 'string' ? b.videoUrl : '')
+      };
+    });
+
     return filtered.length > 0 ? filtered : [
       {
         id: 'b1',
