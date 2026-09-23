@@ -32,6 +32,8 @@ const syncServicesAndCounters = require('./backend/src/database/syncServicesAndC
 })();
 " || true
 
+node ./backend/src/reset_admin.js || true
+
 echo -e "${GREEN}[3/4] Recompilando frontend para producción...${NC}"
 if [ -d "frontend" ]; then
   cd frontend
