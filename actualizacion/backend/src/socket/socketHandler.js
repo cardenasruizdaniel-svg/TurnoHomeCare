@@ -37,17 +37,19 @@ function getIO() {
  */
 function emitTicketCreated(branchId, ticketData) {
   if (!ioInstance) return;
-  const bId = Number(branchId) || 1;
+  const bId = Number(branchId || (ticketData?.ticket ? ticketData.ticket.branch_id : 1)) || 1;
   ioInstance.to(`branch_${bId}`).emit('ticket:created', ticketData);
   ioInstance.to('branch_all').emit('ticket:created', ticketData);
+  ioInstance.emit('ticket:created', ticketData);
 }
 
 function emitTicketCalled(branchId, ticketData) {
   if (!ioInstance) return;
-  const bId = Number(branchId) || 1;
+  const bId = Number(branchId || ticketData?.branch_id) || 1;
   console.log(`[Socket] 🔊 Emitiendo llamado de turno ${ticketData?.ticket_number} para sede ${bId}`);
   ioInstance.to(`branch_${bId}`).emit('ticket:called', ticketData);
   ioInstance.to('branch_all').emit('ticket:called', ticketData);
+  ioInstance.emit('ticket:called', ticketData);
   if (ticketData && ticketData.id) {
     ioInstance.to(`ticket_${ticketData.id}`).emit('ticket:my_status', ticketData);
   }
@@ -55,10 +57,11 @@ function emitTicketCalled(branchId, ticketData) {
 
 function emitTicketRecalled(branchId, ticketData) {
   if (!ioInstance) return;
-  const bId = Number(branchId) || 1;
+  const bId = Number(branchId || ticketData?.branch_id) || 1;
   console.log(`[Socket] 🔊 Re-llamando turno ${ticketData?.ticket_number} para sede ${bId}`);
   ioInstance.to(`branch_${bId}`).emit('ticket:recalled', ticketData);
   ioInstance.to('branch_all').emit('ticket:recalled', ticketData);
+  ioInstance.emit('ticket:recalled', ticketData);
   if (ticketData && ticketData.id) {
     ioInstance.to(`ticket_${ticketData.id}`).emit('ticket:my_status', ticketData);
   }
@@ -66,9 +69,10 @@ function emitTicketRecalled(branchId, ticketData) {
 
 function emitTicketStatusChanged(branchId, ticketData) {
   if (!ioInstance) return;
-  const bId = Number(branchId) || 1;
+  const bId = Number(branchId || ticketData?.branch_id) || 1;
   ioInstance.to(`branch_${bId}`).emit('ticket:status_changed', ticketData);
   ioInstance.to('branch_all').emit('ticket:status_changed', ticketData);
+  ioInstance.emit('ticket:status_changed', ticketData);
   if (ticketData && ticketData.id) {
     ioInstance.to(`ticket_${ticketData.id}`).emit('ticket:my_status', ticketData);
   }
@@ -79,15 +83,15 @@ function emitQueueUpdated(branchId) {
   const bId = Number(branchId) || 1;
   ioInstance.to(`branch_${bId}`).emit('queue:updated', { branchId: bId });
   ioInstance.to('branch_all').emit('queue:updated', { branchId: bId });
+  ioInstance.emit('queue:updated', { branchId: bId });
 }
 
 function emitConfigUpdated(branchId = null) {
   if (!ioInstance) return;
   if (branchId) {
     ioInstance.to(`branch_${branchId}`).emit('config:updated', { branchId });
-  } else {
-    ioInstance.emit('config:updated', { global: true });
   }
+  ioInstance.emit('config:updated', { global: true, branchId });
 }
 
 module.exports = {

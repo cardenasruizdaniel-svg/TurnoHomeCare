@@ -87,6 +87,15 @@ class SettingsService {
         await db.prepare('INSERT INTO settings (branch_id, key, value, description, data_type) VALUES (?, ?, ?, ?, ?)')
           .run(branchId, key, strVal, '', dtype);
       }
+
+      // Si se actualizan configuraciones globales, limpiar sobreescrituras desfasadas por sede para aplicar a todas las sedes
+      if (!branchId) {
+        try {
+          await db.prepare('DELETE FROM settings WHERE key = ? AND branch_id IS NOT NULL').run(key);
+        } catch (e) {
+          // Ignorar silenciosamente
+        }
+      }
     }
   }
 
