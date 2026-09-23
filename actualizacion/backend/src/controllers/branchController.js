@@ -12,6 +12,7 @@ class BranchController {
         SELECT b.*, c.name as company_name, c.logo_url, c.primary_color
         FROM branches b
         JOIN companies c ON b.company_id = c.id
+        WHERE b.is_active = 1
         ORDER BY b.id ASC
       `).all();
 

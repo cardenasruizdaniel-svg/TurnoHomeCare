@@ -340,28 +340,24 @@ export function PublicDisplayView() {
               )}
             </div>
             <div className="flex items-center gap-2 mt-0.5" onClick={(e) => e.stopPropagation()}>
-              <Building2 className="w-3.5 h-3.5 text-teal-400 shrink-0" />
-              {availableBranches.length > 0 ? (
-                <select
-                  value={branchId}
-                  onChange={(e) => handleBranchChange(e.target.value)}
-                  className={`text-xs font-bold px-2 py-0.5 rounded-lg border outline-none cursor-pointer ${
-                    d
-                      ? 'bg-slate-800 text-teal-300 border-slate-700 hover:border-teal-500'
-                      : 'bg-teal-50 text-teal-700 border-teal-200 hover:border-teal-400'
-                  }`}
-                  title="Cambiar la Sede que se muestra en esta pantalla TV"
-                >
-                  {availableBranches.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.name}
+              <Building2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              <select
+                value={branchId}
+                onChange={(e) => handleBranchChange(e.target.value)}
+                className="text-xs font-black px-3 py-1 rounded-xl bg-slate-800 text-emerald-300 border-2 border-emerald-500/60 hover:border-emerald-400 outline-none cursor-pointer shadow-lg shadow-emerald-500/10 transition"
+                title="Seleccionar Sede a Proyectar en la TV"
+              >
+                {availableBranches.length > 0 ? (
+                  availableBranches.map((b) => (
+                    <option key={b.id} value={b.id} className="bg-slate-900 text-white font-bold">
+                      Sede: {b.name}
                     </option>
-                  ))}
-                  <option value="all">🌐 Todas las Sedes (Global)</option>
-                </select>
-              ) : (
-                <span className="text-xs font-semibold text-teal-500">{branch.name}</span>
-              )}
+                  ))
+                ) : (
+                  <option value={branchId}>{branch?.name || 'Cargando Sedes...'}</option>
+                )}
+                <option value="all" className="bg-slate-900 text-teal-300 font-bold">🌐 Transmitir Todas las Sedes (Global)</option>
+              </select>
             </div>
           </div>
         </div>
