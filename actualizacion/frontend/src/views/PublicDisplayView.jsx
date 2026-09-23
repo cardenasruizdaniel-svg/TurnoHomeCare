@@ -294,10 +294,7 @@ export function PublicDisplayView() {
 
   return (
     <div 
-      onClick={() => {
-        if (!audioUnlocked) unlockAudio();
-      }}
-      className={`fixed inset-0 flex flex-col justify-between overflow-hidden select-none font-sans cursor-pointer transition-colors duration-300 ${
+      className={`fixed inset-0 flex flex-col justify-between overflow-hidden select-none font-sans transition-colors duration-300 ${
         d ? 'bg-slate-950 text-white' : 'bg-slate-100 text-slate-900'
       }`}
     >
