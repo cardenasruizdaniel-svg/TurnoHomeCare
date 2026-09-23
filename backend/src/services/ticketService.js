@@ -663,43 +663,81 @@ class TicketService {
    */
   static async getPublicDisplayData(branchId = 1) {
     await this.activateScheduledTicketsForToday();
-    const historyCount = await SettingsService.get('HISTORIAL_PANTALLA_CANTIDAD', branchId) || 6;
+    const isAll = branchId === 'all' || branchId === 0;
+    const targetBId = isAll ? 1 : Number(branchId || 1);
+    const historyCount = await SettingsService.get('HISTORIAL_PANTALLA_CANTIDAD', targetBId) || 6;
 
     // Turno actualmente en llamado o atención más reciente
-    const currentTicket = await db.prepare(`
-      SELECT t.*, s.name as service_name, s.code as service_code,
-             c.name as counter_name, c.code as counter_code,
-             p.full_name as patient_name, p.document_number
-      FROM tickets t
-      JOIN services s ON t.service_id = s.id
-      JOIN counters c ON t.counter_id = c.id
-      JOIN patients p ON t.patient_id = p.id
-      WHERE t.branch_id = ? 
-        AND t.status IN ('LLAMADO', 'EN_ATENCION')
-      ORDER BY t.called_at DESC LIMIT 1
-    `).get(branchId);
+    const currentTicket = isAll
+      ? await db.prepare(`
+          SELECT t.*, s.name as service_name, s.code as service_code,
+                 c.name as counter_name, c.code as counter_code,
+                 p.full_name as patient_name, p.document_number,
+                 b.name as branch_name
+          FROM tickets t
+          JOIN services s ON t.service_id = s.id
+          JOIN counters c ON t.counter_id = c.id
+          JOIN patients p ON t.patient_id = p.id
+          JOIN branches b ON t.branch_id = b.id
+          WHERE t.status IN ('LLAMADO', 'EN_ATENCION')
+          ORDER BY t.called_at DESC LIMIT 1
+        `).get()
+      : await db.prepare(`
+          SELECT t.*, s.name as service_name, s.code as service_code,
+                 c.name as counter_name, c.code as counter_code,
+                 p.full_name as patient_name, p.document_number,
+                 b.name as branch_name
+          FROM tickets t
+          JOIN services s ON t.service_id = s.id
+          JOIN counters c ON t.counter_id = c.id
+          JOIN patients p ON t.patient_id = p.id
+          JOIN branches b ON t.branch_id = b.id
+          WHERE t.branch_id = ? 
+            AND t.status IN ('LLAMADO', 'EN_ATENCION')
+          ORDER BY t.called_at DESC LIMIT 1
+        `).get(targetBId);
 
     // Historial de últimos turnos llamados
-    const recentTickets = await db.prepare(`
-      SELECT t.*, s.name as service_name, s.code as service_code,
-             c.name as counter_name, c.code as counter_code,
-             p.full_name as patient_name, p.document_number
-      FROM tickets t
-      JOIN services s ON t.service_id = s.id
-      JOIN counters c ON t.counter_id = c.id
-      JOIN patients p ON t.patient_id = p.id
-      WHERE t.branch_id = ?
-        AND t.status IN ('LLAMADO', 'EN_ATENCION', 'FINALIZADO', 'NO_PRESENTO')
-        AND (? IS NULL OR t.id != ?)
-      ORDER BY t.called_at DESC LIMIT ?
-    `).all(branchId, currentTicket ? currentTicket.id : null, currentTicket ? currentTicket.id : null, historyCount);
+    const recentTickets = isAll
+      ? await db.prepare(`
+          SELECT t.*, s.name as service_name, s.code as service_code,
+                 c.name as counter_name, c.code as counter_code,
+                 p.full_name as patient_name, p.document_number,
+                 b.name as branch_name
+          FROM tickets t
+          JOIN services s ON t.service_id = s.id
+          JOIN counters c ON t.counter_id = c.id
+          JOIN patients p ON t.patient_id = p.id
+          JOIN branches b ON t.branch_id = b.id
+          WHERE t.status IN ('LLAMADO', 'EN_ATENCION', 'FINALIZADO', 'NO_PRESENTO')
+            AND (? IS NULL OR t.id != ?)
+          ORDER BY t.called_at DESC LIMIT ?
+        `).all(currentTicket ? currentTicket.id : null, currentTicket ? currentTicket.id : null, historyCount)
+      : await db.prepare(`
+          SELECT t.*, s.name as service_name, s.code as service_code,
+                 c.name as counter_name, c.code as counter_code,
+                 p.full_name as patient_name, p.document_number,
+                 b.name as branch_name
+          FROM tickets t
+          JOIN services s ON t.service_id = s.id
+          JOIN counters c ON t.counter_id = c.id
+          JOIN patients p ON t.patient_id = p.id
+          JOIN branches b ON t.branch_id = b.id
+          WHERE t.branch_id = ?
+            AND t.status IN ('LLAMADO', 'EN_ATENCION', 'FINALIZADO', 'NO_PRESENTO')
+            AND (? IS NULL OR t.id != ?)
+          ORDER BY t.called_at DESC LIMIT ?
+        `).all(targetBId, currentTicket ? currentTicket.id : null, currentTicket ? currentTicket.id : null, historyCount);
 
-    const branch = await db.prepare('SELECT * FROM branches WHERE id = ?').get(branchId);
-    const company = branch ? await db.prepare('SELECT * FROM companies WHERE id = ?').get(branch.company_id) : null;
-    const settings = await SettingsService.getAll(branchId);
+    const branch = isAll
+      ? { id: 'all', name: 'Todas las Sedes (Global)', company_id: 1 }
+      : await db.prepare('SELECT * FROM branches WHERE id = ?').get(targetBId);
+    
+    const company = await db.prepare('SELECT * FROM companies WHERE id = 1').get();
+    const settings = await SettingsService.getAll(targetBId);
 
     const effectiveBaseUrl = await TunnelService.getEffectivePublicUrl(process.env.PORT || 5000);
-    const publicRequestUrl = `${effectiveBaseUrl}/solicitar-turno?branchId=${branchId}`;
+    const publicRequestUrl = `${effectiveBaseUrl}/solicitar-turno?branchId=${isAll ? 1 : targetBId}`;
 
     return {
       current_ticket: currentTicket || null,

@@ -127,10 +127,10 @@ async function syncServicesAndCounters() {
   try {
     await db.init();
 
-    // 0. Sincronizar Sedes Oficiales HomeCare (Únicamente si no existen)
-    for (const b of officialBranches) {
-      const existing = await db.prepare("SELECT id FROM branches WHERE id = ? OR code = ?").get(b.id, b.code);
-      if (!existing) {
+    // 0. Sincronizar Sedes Oficiales HomeCare (Únicamente si la tabla de sedes está completamente vacía)
+    const branchCount = await db.prepare("SELECT COUNT(*) as total FROM branches").get();
+    if (!branchCount || branchCount.total === 0) {
+      for (const b of officialBranches) {
         await db.prepare(`
           INSERT INTO branches (id, company_id, code, name, address, phone, business_hours, qr_code_slug, is_active)
           VALUES (?, 1, ?, ?, ?, ?, ?, ?, 1)
@@ -161,57 +161,55 @@ async function syncServicesAndCounters() {
     // 3. BORRAR todos los módulos que no estén en la lista oficial de los 5 requeridos
     const counterCodes = officialCounters.map(c => c.code);
     const cPlaceholders = counterCodes.map(() => '?').join(',');
-    await db.prepare(`DELETE FROM counter_services WHERE counter_id IN (SELECT id FROM counters WHERE code NOT IN (${cPlaceholders}))`).run(...counterCodes);
-    await db.prepare(`DELETE FROM counters WHERE code NOT IN (${cPlaceholders})`).run(...counterCodes);
-
-    // 4. Insertar o actualizar los 5 consultorios/módulos oficiales requeridos
-    for (const c of officialCounters) {
-      const existing = await db.prepare("SELECT id FROM counters WHERE code = ?").get(c.code);
-      if (!existing) {
-        await db.prepare("INSERT INTO counters (branch_id, code, name, is_active) VALUES (1, ?, ?, 1)")
-          .run(c.code, c.name);
-      } else {
-        await db.prepare("UPDATE counters SET name = ?, is_active = 1 WHERE id = ?").run(c.name, existing.id);
-      }
+    try {
+      await db.prepare(`DELETE FROM counter_services WHERE counter_id IN (SELECT id FROM counters WHERE code NOT IN (${cPlaceholders}))`).run(...counterCodes);
+      await db.prepare(`DELETE FROM counters WHERE code NOT IN (${cPlaceholders})`).run(...counterCodes);
+    } catch (e) {
+      console.warn("No se pudieron limpiar módulos descontinuados:", e.message);
     }
 
-    const allServices = await db.prepare("SELECT id, code FROM services WHERE is_active = 1").all();
-    const allCounters = await db.prepare("SELECT id, code FROM counters WHERE is_active = 1").all();
+    // 4. Insertar o actualizar los 5 consultorios/módulos oficiales requeridos PARA TODAS LAS SEDES REGISTRADAS
+    const allBranches = await db.prepare("SELECT id FROM branches WHERE is_active = 1").all();
+    const targetBranchIds = (allBranches && allBranches.length > 0) ? allBranches.map(b => b.id) : [1];
 
-    const counterMap = {};
-    (allCounters || []).forEach(c => { counterMap[c.code] = c.id; });
-
-    const serviceMap = {};
-    (allServices || []).forEach(s => { serviceMap[s.code] = s.id; });
-
-    // Ventanilla 1 y 2 atienden los 10 servicios
-    if (counterMap["MOD-1"]) {
-      for (const s of (allServices || [])) {
-        await db.prepare("INSERT INTO counter_services (counter_id, service_id) VALUES (?, ?) ON CONFLICT DO NOTHING").run(counterMap["MOD-1"], s.id);
-      }
-    }
-    if (counterMap["MOD-2"]) {
-      for (const s of (allServices || [])) {
-        await db.prepare("INSERT INTO counter_services (counter_id, service_id) VALUES (?, ?) ON CONFLICT DO NOTHING").run(counterMap["MOD-2"], s.id);
-      }
-    }
-
-    // Entrevista 1 y 2 atienden Psicología y Nutrición
-    for (const entCode of ["ENT-1", "ENT-2"]) {
-      if (counterMap[entCode]) {
-        for (const code of ["PSI", "NUT"]) {
-          if (serviceMap[code]) {
-            await db.prepare("INSERT INTO counter_services (counter_id, service_id) VALUES (?, ?) ON CONFLICT DO NOTHING").run(counterMap[entCode], serviceMap[code]);
-          }
+    for (const bId of targetBranchIds) {
+      for (const c of officialCounters) {
+        const existing = await db.prepare("SELECT id FROM counters WHERE code = ? AND branch_id = ?").get(c.code, bId);
+        if (!existing) {
+          await db.prepare("INSERT INTO counters (branch_id, code, name, is_active) VALUES (?, ?, ?, 1)")
+            .run(bId, c.code, c.name);
+        } else {
+          await db.prepare("UPDATE counters SET name = ?, is_active = 1 WHERE id = ?").run(c.name, existing.id);
         }
       }
     }
 
-    // Consultorio 1 atiende Consulta General, Cita Especializada, Medicina General, Pediatría, Terapias
-    if (counterMap["CONS-1"]) {
-      for (const code of ["CG", "CME", "MG", "PED", "FIS", "TO", "TR"]) {
-        if (serviceMap[code]) {
-          await db.prepare("INSERT INTO counter_services (counter_id, service_id) VALUES (?, ?) ON CONFLICT DO NOTHING").run(counterMap["CONS-1"], serviceMap[code]);
+    const allServices = await db.prepare("SELECT id, code FROM services WHERE is_active = 1").all();
+    const allCounters = await db.prepare("SELECT id, code, branch_id FROM counters WHERE is_active = 1").all();
+
+    const serviceMap = {};
+    (allServices || []).forEach(s => { serviceMap[s.code] = s.id; });
+
+    // Vincular servicios a módulos para cada sede
+    for (const c of (allCounters || [])) {
+      if (c.code === "MOD-1" || c.code === "MOD-2") {
+        // Ventanillas atienden todos los servicios
+        for (const s of (allServices || [])) {
+          await db.prepare("INSERT INTO counter_services (counter_id, service_id) VALUES (?, ?) ON CONFLICT DO NOTHING").run(c.id, s.id);
+        }
+      } else if (c.code === "ENT-1" || c.code === "ENT-2") {
+        // Entrevistas atienden Psicología y Nutrición
+        for (const code of ["PSI", "NUT"]) {
+          if (serviceMap[code]) {
+            await db.prepare("INSERT INTO counter_services (counter_id, service_id) VALUES (?, ?) ON CONFLICT DO NOTHING").run(c.id, serviceMap[code]);
+          }
+        }
+      } else if (c.code === "CONS-1") {
+        // Consultorio 1 atiende servicios médicos y terapéuticos (incluyendo Psicología para flexibilidad de sedes)
+        for (const code of ["CG", "CME", "MG", "PED", "FIS", "TO", "TR", "PSI", "NUT"]) {
+          if (serviceMap[code]) {
+            await db.prepare("INSERT INTO counter_services (counter_id, service_id) VALUES (?, ?) ON CONFLICT DO NOTHING").run(c.id, serviceMap[code]);
+          }
         }
       }
     }

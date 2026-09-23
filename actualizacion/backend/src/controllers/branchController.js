@@ -2,6 +2,7 @@ const QRCode = require('qrcode');
 const db = require('../config/database');
 const AuditService = require('../services/auditService');
 const TunnelService = require('../services/tunnelService');
+const socketHandler = require('../socket/socketHandler');
 require('dotenv').config();
 
 class BranchController {
@@ -96,6 +97,7 @@ class BranchController {
         details: { code, name }
       });
 
+      socketHandler.emitConfigUpdated();
       res.status(201).json({ success: true, id: result.lastInsertRowid });
     } catch (err) {
       res.status(400).json({ success: false, error: err.message });
@@ -127,6 +129,7 @@ class BranchController {
         details: { name }
       });
 
+      socketHandler.emitConfigUpdated(id);
       res.json({ success: true, message: 'Sede actualizada exitosamente' });
     } catch (err) {
       res.status(400).json({ success: false, error: err.message });
@@ -158,6 +161,7 @@ class BranchController {
         details: { name: existing.name, code: existing.code }
       });
 
+      socketHandler.emitConfigUpdated();
       res.json({ success: true, message: 'Sede eliminada exitosamente' });
     } catch (err) {
       res.status(400).json({ success: false, error: err.message });
