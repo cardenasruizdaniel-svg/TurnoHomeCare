@@ -35,8 +35,17 @@ export function PublicDisplayView() {
   // Cargar sedes disponibles para selector de TV
   useEffect(() => {
     api.getPublicBranches().then(res => {
-      if (res.success && res.branches) {
+      if (res.success && res.branches && res.branches.length > 0) {
         setAvailableBranches(res.branches);
+        // Validar si la sede guardada/solicitada fue eliminada
+        if (branchId !== 'all') {
+          const exists = res.branches.find(b => b.id === Number(branchId));
+          if (!exists) {
+            const fallbackId = res.branches[0].id;
+            setBranchId(fallbackId);
+            localStorage.setItem('deaturnos_tv_branch_id', String(fallbackId));
+          }
+        }
       }
     }).catch(err => console.warn('Error cargando sedes públicas:', err));
   }, []);

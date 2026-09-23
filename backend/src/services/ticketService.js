@@ -659,13 +659,25 @@ class TicketService {
   }
 
   /**
+   * Resuelve dinámicamente un ID de sede válido si la solicitada no existe o fue eliminada
+   */
+  static async resolveActiveBranchId(requestedBranchId = null) {
+    if (requestedBranchId && requestedBranchId !== 'all' && requestedBranchId !== 0) {
+      const existing = await db.prepare('SELECT id FROM branches WHERE id = ? AND is_active = 1').get(Number(requestedBranchId));
+      if (existing) return existing.id;
+    }
+    const firstActive = await db.prepare('SELECT id FROM branches WHERE is_active = 1 ORDER BY id ASC LIMIT 1').get();
+    return firstActive ? firstActive.id : 1;
+  }
+
+  /**
    * Datos para la Pantalla Pública TV
    */
   static async getPublicDisplayData(branchId = 1) {
     await this.activateScheduledTicketsForToday();
     const isAll = branchId === 'all' || branchId === 0;
-    const targetBId = isAll ? 1 : Number(branchId || 1);
-    const historyCount = await SettingsService.get('HISTORIAL_PANTALLA_CANTIDAD', targetBId) || 6;
+    const resolvedBId = isAll ? 1 : await this.resolveActiveBranchId(branchId);
+    const historyCount = await SettingsService.get('HISTORIAL_PANTALLA_CANTIDAD', resolvedBId) || 6;
 
     // Turno actualmente en llamado o atención más reciente
     const currentTicket = isAll
@@ -695,7 +707,7 @@ class TicketService {
           WHERE t.branch_id = ? 
             AND t.status IN ('LLAMADO', 'EN_ATENCION')
           ORDER BY t.called_at DESC LIMIT 1
-        `).get(targetBId);
+        `).get(resolvedBId);
 
     // Historial de últimos turnos llamados
     const recentTickets = isAll
@@ -727,17 +739,17 @@ class TicketService {
             AND t.status IN ('LLAMADO', 'EN_ATENCION', 'FINALIZADO', 'NO_PRESENTO')
             AND (? IS NULL OR t.id != ?)
           ORDER BY t.called_at DESC LIMIT ?
-        `).all(targetBId, currentTicket ? currentTicket.id : null, currentTicket ? currentTicket.id : null, historyCount);
+        `).all(resolvedBId, currentTicket ? currentTicket.id : null, currentTicket ? currentTicket.id : null, historyCount);
 
     const branch = isAll
       ? { id: 'all', name: 'Todas las Sedes (Global)', company_id: 1 }
-      : await db.prepare('SELECT * FROM branches WHERE id = ?').get(targetBId);
+      : await db.prepare('SELECT * FROM branches WHERE id = ?').get(resolvedBId);
     
     const company = await db.prepare('SELECT * FROM companies WHERE id = 1').get();
-    const settings = await SettingsService.getAll(targetBId);
+    const settings = await SettingsService.getAll(resolvedBId);
 
     const effectiveBaseUrl = await TunnelService.getEffectivePublicUrl(process.env.PORT || 5000);
-    const publicRequestUrl = `${effectiveBaseUrl}/solicitar-turno?branchId=${isAll ? 1 : targetBId}`;
+    const publicRequestUrl = `${effectiveBaseUrl}/solicitar-turno?branchId=${isAll ? resolvedBId : resolvedBId}`;
 
     return {
       current_ticket: currentTicket || null,
@@ -753,10 +765,11 @@ class TicketService {
   /**
    * Obtiene la cola de espera activa para la sede o módulo y la agenda del día
    */
-  static async getWaitingQueue(branchId = 1, counterId = null) {
+  static async getWaitingQueue(branchId = null, counterId = null) {
     await this.activateScheduledTicketsForToday();
+    const activeBranchId = await this.resolveActiveBranchId(branchId);
     let counterFilter = '';
-    const params = [branchId];
+    const params = [activeBranchId];
     let assignedServiceNames = [];
 
     if (counterId) {
