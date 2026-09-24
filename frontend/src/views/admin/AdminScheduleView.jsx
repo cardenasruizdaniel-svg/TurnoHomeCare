@@ -49,14 +49,23 @@ export function AdminScheduleView() {
   const [services, setServices] = useState([]);
   const [counters, setCounters] = useState([]);
   const [staffUsers, setStaffUsers] = useState([]);
+  const [branches, setBranches] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Modo de vista: 'calendar' | 'list' | 'module'
   const [activeTab, setActiveTab] = useState('list');
 
   // Filtros
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const getLocalDateStr = () => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+  const todayStr = getLocalDateStr();
   const [selectedDate, setSelectedDate] = useState(todayStr);
+  const [branchFilter, setBranchFilter] = useState('all');
   const [serviceFilter, setServiceFilter] = useState('');
   const [counterFilter, setCounterFilter] = useState('');
   const [staffFilter, setStaffFilter] = useState('');
@@ -99,7 +108,7 @@ export function AdminScheduleView() {
   const loadScheduleData = async () => {
     try {
       setLoading(true);
-      const queryParams = { date: selectedDate };
+      const queryParams = { date: selectedDate, branchId: branchFilter };
       if (serviceFilter) queryParams.serviceId = serviceFilter;
       if (counterFilter) queryParams.counterId = counterFilter;
       if (staffFilter) queryParams.userId = staffFilter;
@@ -127,17 +136,19 @@ export function AdminScheduleView() {
     Promise.all([
       api.getServices(),
       api.getCounters(),
-      api.getUsers()
-    ]).then(([srvRes, cntRes, usrRes]) => {
+      api.getUsers(),
+      api.getBranches()
+    ]).then(([srvRes, cntRes, usrRes, brRes]) => {
       if (srvRes.success) setServices(srvRes.services || []);
       if (cntRes.success) setCounters(cntRes.counters || []);
       if (usrRes.success) setStaffUsers((usrRes.users || []).filter(u => u.role_name === 'FUNCIONARIO' || u.role_name === 'SUPERVISOR'));
+      if (brRes.success && brRes.branches) setBranches(brRes.branches || []);
     }).catch(console.error);
   }, []);
 
   useEffect(() => {
     loadScheduleData();
-  }, [selectedDate, serviceFilter, counterFilter, staffFilter, statusFilter, searchQuery]);
+  }, [selectedDate, branchFilter, serviceFilter, counterFilter, staffFilter, statusFilter, searchQuery]);
 
   const showFeedback = (type, text) => {
     setFeedbackMsg({ type, text });
@@ -544,7 +555,7 @@ export function AdminScheduleView() {
             <span>Filtros de Búsqueda</span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
             {/* Búsqueda por Paciente / Cédula / Turno */}
             <div className="relative">
               <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
@@ -556,6 +567,18 @@ export function AdminScheduleView() {
                 className={`w-full pl-9 pr-3 py-2 rounded-xl text-xs font-medium border transition ${inputBg}`}
               />
             </div>
+
+            {/* Sede */}
+            <select
+              value={branchFilter}
+              onChange={(e) => setBranchFilter(e.target.value)}
+              className={`w-full px-3 py-2 rounded-xl text-xs font-medium border transition ${inputBg}`}
+            >
+              <option value="all">Todas las Sedes (Global)</option>
+              {branches.map(b => (
+                <option key={b.id} value={b.id}>{b.name}</option>
+              ))}
+            </select>
 
             {/* Servicio */}
             <select

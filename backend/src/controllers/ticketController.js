@@ -326,7 +326,15 @@ class TicketController {
    */
   static async getSchedule(req, res) {
     try {
-      const branchId = Number(req.query.branchId || (req.user ? req.user.branch_id : 1) || 1);
+      const reqBranch = req.query.branchId;
+      const userBranch = req.user ? req.user.branch_id : null;
+      const isAdmin = req.user && (req.user.role === 'ADMIN' || req.user.role_name === 'ADMIN');
+
+      let branchId = reqBranch;
+      if (!branchId || branchId === 'undefined' || branchId === 'null') {
+        branchId = isAdmin ? 'all' : (userBranch || 'all');
+      }
+
       const { startDate, endDate, date, serviceId, counterId, userId, status, search } = req.query;
 
       const data = await TicketService.getScheduleData({

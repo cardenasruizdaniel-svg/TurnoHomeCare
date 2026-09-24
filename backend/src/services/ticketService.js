@@ -1170,8 +1170,15 @@ class TicketService {
     const _now = new Date(); const today = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, '0')}-${String(_now.getDate()).padStart(2, '0')}`;
     const targetDate = date || today;
 
-    let conditions = ['t.branch_id = ?'];
-    let params = [branchId];
+    const isAll = !branchId || branchId === 'all' || branchId === '0' || Number(branchId) === 0;
+
+    let conditions = [];
+    let params = [];
+
+    if (!isAll) {
+      conditions.push('t.branch_id = ?');
+      params.push(Number(branchId));
+    }
 
     const isTargetToday = targetDate === today;
 
@@ -1245,9 +1252,9 @@ class TicketService {
         SUM(CASE WHEN status = 'CANCELADO' THEN 1 ELSE 0 END) as cancelados,
         SUM(CASE WHEN status = 'NO_PRESENTO' THEN 1 ELSE 0 END) as no_presentados
       FROM tickets
-      WHERE branch_id = ?
+      WHERE (? IS NULL OR branch_id = ?)
       GROUP BY day
-    `).all(branchId);
+    `).all(isAll ? null : Number(branchId), isAll ? null : Number(branchId));
 
     const calendarSummary = {};
     for (const r of calendarRows) {
@@ -1270,18 +1277,18 @@ class TicketService {
         SUM(CASE WHEN status = 'CANCELADO' THEN 1 ELSE 0 END) as cancelados,
         SUM(CASE WHEN status = 'NO_PRESENTO' THEN 1 ELSE 0 END) as no_presentados
       FROM tickets
-      WHERE branch_id = ?
+      WHERE (? IS NULL OR branch_id = ?)
         AND ${dateMetricsCondition}
-    `).get(branchId, targetDate, targetDate);
+    `).get(isAll ? null : Number(branchId), isAll ? null : Number(branchId), targetDate, targetDate);
 
     const activeCountersCount = await db.prepare(`
       SELECT COUNT(DISTINCT counter_id) as count
       FROM tickets
-      WHERE branch_id = ?
+      WHERE (? IS NULL OR branch_id = ?)
         AND ${dateMetricsCondition}
         AND counter_id IS NOT NULL
         AND status IN ('PROGRAMADO', 'ESPERANDO', 'LLAMADO', 'EN_ATENCION')
-    `).get(branchId, targetDate, targetDate);
+    `).get(isAll ? null : Number(branchId), isAll ? null : Number(branchId), targetDate, targetDate);
 
     const dashboardMetrics = {
       programadosHoy: metricsRow ? (metricsRow.programados_hoy || 0) : 0,
@@ -1294,8 +1301,12 @@ class TicketService {
 
     // Desglose por Módulo / Consultorio para la fecha seleccionada
     const allCounters = await db.prepare(`
-      SELECT id, name, code, is_active FROM counters WHERE branch_id = ? ORDER BY code ASC
-    `).all(branchId);
+      SELECT c.*, b.name as branch_name 
+      FROM counters c
+      LEFT JOIN branches b ON c.branch_id = b.id
+      WHERE c.is_active = 1 AND (? IS NULL OR c.branch_id = ?)
+      ORDER BY c.code ASC
+    `).all(isAll ? null : Number(branchId), isAll ? null : Number(branchId));
 
     const moduleWorkload = allCounters.map(counter => {
       const counterTickets = tickets.filter(t => t.counter_id === counter.id);
