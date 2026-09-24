@@ -131,7 +131,7 @@ async function seedDatabase() {
       [null, 'PREVENIR_DUPLICADOS', 'true', 'Impedir solicitar un segundo turno si ya tiene uno en espera', 'boolean'],
       [null, 'REINICIO_DIARIO', 'true', 'Reiniciar consecutivo de turnos cada medianoche', 'boolean'],
       [null, 'HISTORIAL_PANTALLA_CANTIDAD', '6', 'Número de turnos anteriores a mostrar en la pantalla pública', 'number'],
-      [null, 'NOMBRE_INSTITUCION', 'IPS Salud Integral & Vida', 'Nombre visible en pantallas y tickets', 'string'],
+      [null, 'NOMBRE_INSTITUCION', 'HomeCare del Quindío I.P.S.', 'Nombre visible en pantallas y tickets', 'string'],
       [null, 'MENSAJE_PANTALLA', 'Por favor permanezca atento a la pantalla y cuide sus pertenencias.', 'Mensaje inferior en pantalla pública', 'string'],
       [null, 'HORA_APERTURA', '06:00', 'Hora inicial permitida para solicitar turnos', 'string'],
       [null, 'HORA_CIERRE', '19:00', 'Hora límite permitida para solicitar turnos', 'string']

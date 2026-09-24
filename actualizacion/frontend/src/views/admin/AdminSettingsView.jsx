@@ -110,11 +110,13 @@ export function AdminSettingsView() {
 
   // Company Branding State
   const [company, setCompany] = useState({
-    name: 'IPS Salud Integral & Vida',
-    nit: '900.123.456-7',
-    primary_color: '#0284c7',
-    secondary_color: '#0f172a',
-    logo_url: '/favicon.svg'
+    name: 'HomeCare del Quindío I.P.S.',
+    nit: '901.458.789-2',
+    slogan: 'Bienestar en casa.',
+    primary_color: '#e1136c',
+    secondary_color: '#00b0b9',
+    accent_color: '#7cb518',
+    logo_url: '/homecare-logo.png'
   });
 
   const sanitizePrimitive = (v, defaultVal = '') => {
@@ -133,7 +135,7 @@ export function AdminSettingsView() {
         if (res.company && typeof res.company === 'object') {
           setCompany({
             name: sanitizePrimitive(res.company.name, 'HomeCare del Quindío I.P.S.'),
-            nit: sanitizePrimitive(res.company.nit, ''),
+            nit: sanitizePrimitive(res.company.nit, '901.458.789-2'),
             slogan: sanitizePrimitive(res.company.slogan, 'Bienestar en casa.'),
             logo_url: sanitizePrimitive(res.company.logo_url, '/homecare-logo.png'),
             primary_color: sanitizePrimitive(res.company.primary_color, '#e1136c'),
