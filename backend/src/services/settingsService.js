@@ -37,9 +37,18 @@ class SettingsService {
     if (branchId) {
       const branchSettings = await db.prepare('SELECT * FROM settings WHERE branch_id = ?').all(branchId);
       (branchSettings || []).forEach(bs => {
+        const casted = this.castValue(bs.value, bs.data_type);
+        if (bs.key === 'BANNERS_PUBLICIDAD') {
+          let list = [];
+          if (Array.isArray(casted)) list = casted;
+          else if (typeof casted === 'string' && casted.trim().length > 0) {
+            try { list = JSON.parse(casted); } catch {}
+          }
+          if (!list || list.length === 0) return;
+        }
         result[bs.key] = {
           key: bs.key,
-          value: this.castValue(bs.value, bs.data_type),
+          value: casted,
           description: bs.description,
           data_type: bs.data_type,
           is_branch_override: true
