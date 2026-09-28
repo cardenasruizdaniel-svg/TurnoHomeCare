@@ -3,7 +3,7 @@ const syncServicesAndCounters = require('./database/syncServicesAndCounters');
 
 async function restoreBranches() {
   await db.init();
-  console.log('🔄 Restaurando Empresa Oficial, Sedes y Módulos en la base de datos...');
+  console.log('🔄 Restaurando Empresa Oficial, Sedes y Purgando Banners Viejos...');
 
   // 1. Asegurar / Forzar Empresa ID 1 a HomeCare del Quindío I.P.S.
   const existingCompany = await db.prepare("SELECT id FROM companies WHERE id = 1").get();
@@ -26,12 +26,22 @@ async function restoreBranches() {
     `).run();
   }
 
-  // Eliminar cualquier configuración obsoleta NOMBRE_INSTITUCION que pudiera haber guardado el nombre de prueba anterior
+  // 2. PURGAR SOBREESCRITURAS OBSOLETAS O BANNERS VIEJOS POR SEDE
   try {
     await db.prepare("DELETE FROM settings WHERE key = 'NOMBRE_INSTITUCION'").run();
-  } catch (e) {}
+    await db.prepare("DELETE FROM settings WHERE key = 'BANNERS_PUBLICIDAD' AND branch_id IS NOT NULL").run();
+    
+    // Limpiar de la tabla de configuraciones globales cualquier rastro de la foto vieja del consultorio odontológico/médico
+    const globalBanners = await db.prepare("SELECT id, value FROM settings WHERE key = 'BANNERS_PUBLICIDAD' AND branch_id IS NULL").get();
+    if (globalBanners && globalBanners.value && (globalBanners.value.includes('unsplash') || globalBanners.value.includes('Citas y Consultas'))) {
+      console.log('🧹 Eliminando banners de prueba antiguos de la base de datos...');
+      await db.prepare("DELETE FROM settings WHERE id = ?").run(globalBanners.id);
+    }
+  } catch (e) {
+    console.warn('Aviso limpiando configuraciones:', e.message);
+  }
 
-  // 2. Reactivar/Crear Sede 1 y Sede 2
+  // 3. Reactivar/Crear Sede 1 y Sede 2
   await db.prepare(`
     INSERT INTO branches (id, company_id, code, name, address, phone, business_hours, qr_code_slug, is_active)
     VALUES (1, 1, 'SEDE-ARMENIA', 'Sede Principal (Armenia)', 'Carrera 13 #3N 50, medicentro Alcazar cons 706', '+57 323 479 0311', 'Lunes a Viernes: 7:00 AM - 6:00 PM', 'sede-armenia', 1)
@@ -44,11 +54,11 @@ async function restoreBranches() {
     ON CONFLICT(id) DO UPDATE SET is_active = 1, name = 'Sede Circasia', company_id = 1
   `).run();
 
-  // 3. Ejecutar sincronización de servicios y módulos
+  // 4. Ejecutar sincronización de servicios y módulos
   await syncServicesAndCounters();
 
   console.log('========================================================');
-  console.log(' ✅ EMPRESA, SEDES Y MÓDULOS RESTAURADOS EXITOSAMENTE');
+  console.log(' ✅ EMPRESA, SEDES Y BANNERS PURGADOS EXITOSAMENTE');
   console.log(' Empresa: HomeCare del Quindío I.P.S.');
   console.log(' Sede 1: Sede Principal (Armenia)');
   console.log(' Sede 2: Sede Circasia');

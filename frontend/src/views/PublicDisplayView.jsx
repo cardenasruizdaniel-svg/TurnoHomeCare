@@ -221,7 +221,10 @@ export function PublicDisplayView() {
         if (cached) {
           const parsedCache = JSON.parse(cached);
           if (Array.isArray(parsedCache) && parsedCache.length > 0) {
-            list = parsedCache;
+            const cleanCached = parsedCache.filter(b => b && typeof b === 'object' && !JSON.stringify(b).includes('unsplash') && !JSON.stringify(b).includes('Citas y Consultas'));
+            if (cleanCached.length > 0) {
+              list = cleanCached;
+            }
           }
         }
       } catch {}
