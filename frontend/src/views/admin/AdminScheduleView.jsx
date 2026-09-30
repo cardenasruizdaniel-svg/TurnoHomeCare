@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useLocation } from 'react-router-dom';
 import {
   Calendar as CalendarIcon,
   Plus,
@@ -32,7 +31,6 @@ import { Modal } from '../../components/Modal';
 export function AdminScheduleView() {
   const { user } = useAuth();
   const { isDark } = useTheme();
-  const location = useLocation();
 
   // Estados de datos
   const [tickets, setTickets] = useState([]);
@@ -151,13 +149,6 @@ export function AdminScheduleView() {
   useEffect(() => {
     loadScheduleData();
   }, [selectedDate, branchFilter, serviceFilter, counterFilter, staffFilter, statusFilter, searchQuery]);
-
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    if (params.get('create') === 'true') {
-      openCreateModal();
-    }
-  }, [location.search]);
 
   const showFeedback = (type, text) => {
     setFeedbackMsg({ type, text });
