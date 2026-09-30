@@ -32,15 +32,9 @@ case $OPTION in
   1)
     echo -e "${GREEN}[1/3] Instalando Cloudflare Tunnel (cloudflared)...${NC}"
     if ! command -v cloudflared &> /dev/null; then
-      if command -v apt-get &> /dev/null; then
-        mkdir -p /etc/apt/keyrings
-        curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg | tee /etc/apt/keyrings/cloudflare-main.gpg >/dev/null
-        echo "deb [signed-by=/etc/apt/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared $(lsb_release -cs 2>/dev/null || echo 'bookworm') main" | tee /etc/apt/sources.list.d/cloudflared.list
-        apt-get update && apt-get install -y cloudflared
-      else
-        curl -L --output /usr/local/bin/cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
-        chmod +x /usr/local/bin/cloudflared
-      fi
+      echo -e "${YELLOW}Descargando ejecutable binario de Cloudflare Tunnel...${NC}"
+      curl -L -o /usr/local/bin/cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
+      chmod +x /usr/local/bin/cloudflared
     fi
 
     echo -e "${GREEN}[2/3] Iniciando túnel rápido de Cloudflare para el puerto 5000...${NC}"
