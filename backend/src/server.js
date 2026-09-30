@@ -84,11 +84,11 @@ app.use((err, req, res, next) => {
 
 const TunnelService = require('./services/tunnelService');
 
-const DEFAULT_PORT = Number(process.env.PORT) || 5000;
+const DEFAULT_PORT = Number(process.env.PORT) || 5050;
 
 function listenOnAvailablePort(initialPort) {
   return new Promise((resolve, reject) => {
-    let currentPort = Number(initialPort) || 5000;
+    let currentPort = Number(initialPort) || 5050;
 
     function tryListen(portToTry) {
       const tempServer = server.listen(portToTry, async () => {

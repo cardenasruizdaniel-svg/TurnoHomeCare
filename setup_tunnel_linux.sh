@@ -37,14 +37,15 @@ case $OPTION in
       chmod +x /usr/local/bin/cloudflared
     fi
 
-    echo -e "${GREEN}[2/3] Iniciando túnel rápido de Cloudflare para el puerto 5000...${NC}"
+    TARGET_PORT=$(cat backend/data/active_port.txt 2>/dev/null || echo "5050")
+    echo -e "${GREEN}[2/3] Iniciando túnel rápido de Cloudflare para el puerto ${TARGET_PORT}...${NC}"
     echo -e "${YELLOW}Generando URL pública con HTTPS encriptado...${NC}"
     
     # Detener túnel previo si existía
     pm2 stop deaturnos-tunnel 2>/dev/null || true
     pm2 delete deaturnos-tunnel 2>/dev/null || true
 
-    pm2 start "cloudflared tunnel --url http://localhost:5000" --name "deaturnos-tunnel"
+    pm2 start "cloudflared tunnel --url http://localhost:${TARGET_PORT}" --name "deaturnos-tunnel"
     pm2 save
 
     sleep 4
@@ -54,11 +55,12 @@ case $OPTION in
     ;;
 
   2)
-    echo -e "${GREEN}Iniciando LocalTunnel para puerto 5000...${NC}"
+    TARGET_PORT=$(cat backend/data/active_port.txt 2>/dev/null || echo "5050")
+    echo -e "${GREEN}Iniciando LocalTunnel para puerto ${TARGET_PORT}...${NC}"
     pm2 stop deaturnos-tunnel 2>/dev/null || true
     pm2 delete deaturnos-tunnel 2>/dev/null || true
 
-    pm2 start "npx localtunnel --port 5000" --name "deaturnos-tunnel"
+    pm2 start "npx localtunnel --port ${TARGET_PORT}" --name "deaturnos-tunnel"
     pm2 save
 
     sleep 3
