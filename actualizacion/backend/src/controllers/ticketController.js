@@ -1,4 +1,5 @@
 const TicketService = require('../services/ticketService');
+const NotificationService = require('../services/notificationService');
 const socketHandler = require('../socket/socketHandler');
 const db = require('../config/database');
 
@@ -397,6 +398,12 @@ class TicketController {
 
       if (!result.is_duplicate) {
         socketHandler.emitTicketCreated(branchId, { ticket: result.ticket });
+        
+        // Enviar notificación automática por WhatsApp y Correo (si el cliente los tiene registrados)
+        NotificationService.notifyScheduleOrQuote({
+          ticket: result.ticket,
+          patient: patientData
+        }).catch(err => console.warn('Aviso notificación automatica:', err.message));
       }
 
       res.status(result.is_duplicate ? 200 : 201).json({

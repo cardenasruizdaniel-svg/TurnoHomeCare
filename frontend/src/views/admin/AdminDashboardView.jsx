@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Users,
   CheckCircle2,
@@ -11,7 +12,8 @@ import {
   Building2,
   Calendar,
   RefreshCw,
-  UserX
+  UserX,
+  Plus
 } from 'lucide-react';
 import {
   Chart as ChartJS,
@@ -45,6 +47,7 @@ ChartJS.register(
 
 export function AdminDashboardView() {
   const { isDark } = useTheme();
+  const navigate = useNavigate();
   const [stats, setStats] = useState(null);
   const [branches, setBranches] = useState([]);
   const [selectedBranchId, setSelectedBranchId] = useState('');
@@ -137,7 +140,15 @@ export function AdminDashboardView() {
           <p className={`text-xs sm:text-sm mt-1 ${d ? 'text-slate-400' : 'text-slate-600'}`}>Métricas en tiempo real, afluencia de pacientes y tiempos de atención</p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={() => navigate('/admin/programacion?create=true')}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white text-xs font-black shadow-lg shadow-sky-600/25 transition transform hover:scale-[1.02]"
+          >
+            <Plus className="w-4 h-4" />
+            <span>+ NUEVA COTIZACIÓN / PROGRAMACIÓN</span>
+          </button>
+
           <select
             value={selectedBranchId}
             onChange={(e) => setSelectedBranchId(e.target.value)}
