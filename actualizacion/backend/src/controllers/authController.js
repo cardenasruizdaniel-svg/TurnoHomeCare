@@ -13,19 +13,26 @@ class AuthController {
         return res.status(400).json({ success: false, error: 'CAMPOS_REQUERIDOS', message: 'Usuario y contraseña requeridos' });
       }
 
+      const cleanUsername = String(username).trim();
+      const cleanPassword = String(password).trim();
+
       const user = await db.prepare(`
         SELECT u.*, r.name as role_name, r.permissions as role_permissions, b.name as branch_name
         FROM users u
         JOIN roles r ON u.role_id = r.id
         LEFT JOIN branches b ON u.branch_id = b.id
-        WHERE u.username = ? AND u.is_active = 1
-      `).get(username);
+        WHERE LOWER(u.username) = LOWER(?) AND u.is_active = 1
+      `).get(cleanUsername);
 
       if (!user) {
         return res.status(401).json({ success: false, error: 'CREDENCIALES_INVALIDAS', message: 'Usuario o contraseña incorrectos' });
       }
 
-      const isMatch = bcrypt.compareSync(password, user.password_hash);
+      let isMatch = bcrypt.compareSync(cleanPassword, user.password_hash);
+      if (!isMatch && password !== cleanPassword) {
+        isMatch = bcrypt.compareSync(password, user.password_hash);
+      }
+
       if (!isMatch) {
         return res.status(401).json({ success: false, error: 'CREDENCIALES_INVALIDAS', message: 'Usuario o contraseña incorrectos' });
       }
