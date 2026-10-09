@@ -13,10 +13,14 @@ async function resetCleanDatabase() {
 
   // 1. Respaldo preventivo antes de poner en ceros
   if (fs.existsSync(dbPath)) {
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const backupPath = path.join(backupDir, `deaturnos_backup_BEFORE_FRESH_RESET_${timestamp}.db`);
-    fs.copyFileSync(dbPath, backupPath);
-    console.log(`📦 Respaldo preventivo creado en: ${backupPath}`);
+    try {
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const backupPath = path.join(backupDir, `deaturnos_backup_BEFORE_FRESH_RESET_${timestamp}.db`);
+      fs.copyFileSync(dbPath, backupPath);
+      console.log(`📦 Respaldo preventivo creado en: ${backupPath}`);
+    } catch (e) {
+      console.warn('Aviso respaldando DB previo:', e.message);
+    }
   }
 
   // 2. Eliminar base de datos vieja para iniciar 100% limpia en ceros
