@@ -44,6 +44,10 @@ async function resetAdmin() {
   console.log('========================================================');
 }
 
-resetAdmin().catch(err => {
-  console.error('❌ Error reseteando admin:', err);
-});
+if (require.main === module) {
+  resetAdmin().catch(err => {
+    console.error('❌ Error reseteando admin:', err);
+  });
+}
+
+module.exports = resetAdmin;
