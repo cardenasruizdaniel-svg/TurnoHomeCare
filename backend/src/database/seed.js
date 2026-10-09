@@ -86,13 +86,14 @@ async function seedDatabase() {
 
     // 6. Usuarios Oficiales DEATurnos
     const salt = bcrypt.genSaltSync(10);
+    const hash123 = bcrypt.hashSync('admin123', salt);
     const hashCommon = bcrypt.hashSync('Home2026*', salt);
 
     const insertUser = db.prepare(`
       INSERT OR REPLACE INTO users (id, branch_id, role_id, username, email, password_hash, full_name, is_active)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
-    insertUser.run(1, 1, 1, 'admin', 'admin@homecare.com', hashCommon, 'Ing. Daniel Cárdenas Ruiz', 1);
+    insertUser.run(1, 1, 1, 'admin', 'admin@homecare.com', hash123, 'Ing. Daniel Cárdenas Ruiz', 1);
     insertUser.run(2, 1, 3, 'Consultorio1', 'consultorio1@homecare.com', hashCommon, 'Consultorio 1', 1);
     insertUser.run(3, 1, 3, 'Ventanilla1', 'ventanilla1@homecare.com', hashCommon, 'Ventanilla 1', 1);
     insertUser.run(4, 1, 3, 'Ventanilla2', 'ventanilla2@homecare.com', hashCommon, 'Ventanilla 2', 1);
