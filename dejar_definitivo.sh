@@ -25,7 +25,7 @@ cd "$SCRIPT_DIR"
 echo -e "${GREEN}[1/6] Configurando permisos definitivos de lectura/escritura...${NC}"
 mkdir -p backend/data/backups logs
 chmod -R 777 backend/data logs 2>/dev/null || true
-echo "5050" > backend/data/active_port.txt
+echo "5051" > backend/data/active_port.txt
 chmod 666 backend/data/active_port.txt 2>/dev/null || true
 
 # 2. Inicializar la base de datos limpia en ceros
@@ -40,12 +40,12 @@ if [ -d "actualizacion/frontend/dist" ]; then
   cp -r actualizacion/frontend/dist/* frontend/dist/ 2>/dev/null || true
 fi
 
-# 4. Configurar y persistir PM2 en puerto 5050 (sin conflicto de procesos)
-echo -e "${GREEN}[4/6] Configurando servicio PM2 en puerto 5050...${NC}"
+# 4. Configurar y persistir PM2 en puerto 5051 (sin conflicto con Tailscale)
+echo -e "${GREEN}[4/6] Configurando servicio PM2 en puerto interno 5051...${NC}"
 REAL_USER="${SUDO_USER:-$USER}"
 
-# Liberar puerto 5050 si estuviese tomado por proceso colgado
-fuser -k 5050/tcp 2>/dev/null || lsof -ti:5050 | xargs kill -9 2>/dev/null || true
+# Liberar puerto 5051 si estuviese tomado
+fuser -k 5051/tcp 2>/dev/null || lsof -ti:5051 | xargs kill -9 2>/dev/null || true
 
 if command -v pm2 &> /dev/null; then
   # Limpiar de PM2 root si existe
@@ -54,23 +54,23 @@ if command -v pm2 &> /dev/null; then
   # Registrar y arrancar bajo el usuario real (dala)
   if [ -n "$SUDO_USER" ] && [ "$SUDO_USER" != "root" ]; then
     sudo -u "$SUDO_USER" pm2 delete deaturnos 2>/dev/null || true
-    sudo -u "$SUDO_USER" PORT=5050 pm2 start ecosystem.config.js
+    sudo -u "$SUDO_USER" PORT=5051 pm2 start ecosystem.config.js
     sudo -u "$SUDO_USER" pm2 save
   else
     pm2 delete deaturnos 2>/dev/null || true
-    PORT=5050 pm2 start ecosystem.config.js
+    PORT=5051 pm2 start ecosystem.config.js
     pm2 save
   fi
-  echo -e "${YELLOW}   -> Servicio 'deaturnos' registrado y guardado en PM2 para usuario $REAL_USER.${NC}"
+  echo -e "${YELLOW}   -> Servicio 'deaturnos' registrado y guardado en PM2 (Puerto 5051).${NC}"
 else
   echo -e "${RED}Aviso: PM2 no está instalado globalmente. Ejecute: npm install -g pm2${NC}"
 fi
 
-# 5. Configurar Tailscale Funnel para acceso exterior por puerto 5050
-echo -e "${GREEN}[5/6] Conectando túnel de Tailscale para puerto 5050...${NC}"
+# 5. Configurar Tailscale Funnel para acceso exterior por puerto 5050 apuntando al backend 5051
+echo -e "${GREEN}[5/6] Conectando túnel de Tailscale (Externo 5050 ➔ Interno 5051)...${NC}"
 if command -v tailscale &> /dev/null; then
-  sudo tailscale funnel --bg --https=5050 http://127.0.0.1:5050 2>/dev/null || tailscale funnel --bg --https=5050 http://127.0.0.1:5050 2>/dev/null || true
-  echo -e "${YELLOW}   -> Tailscale Funnel activo apuntando a http://127.0.0.1:5050${NC}"
+  sudo tailscale funnel --bg --https=5050 http://127.0.0.1:5051 2>/dev/null || tailscale funnel --bg --https=5050 http://127.0.0.1:5051 2>/dev/null || true
+  echo -e "${YELLOW}   -> Tailscale Funnel activo: https://...:5050 ➔ http://127.0.0.1:5051${NC}"
 fi
 
 # 6. Prueba automática de salud del servidor y login
@@ -79,7 +79,7 @@ sleep 3
 
 LOGIN_CHECK=""
 for i in {1..5}; do
-  LOGIN_CHECK=$(curl -s -X POST http://127.0.0.1:5050/api/auth/login \
+  LOGIN_CHECK=$(curl -s -X POST http://127.0.0.1:5051/api/auth/login \
     -H "Content-Type: application/json" \
     -d '{"username":"admin","password":"admin123"}' 2>/dev/null || echo "FAILED")
   if echo "$LOGIN_CHECK" | grep -q '"success":true'; then
