@@ -47,11 +47,10 @@ if [ -d "actualizacion/frontend/dist" ]; then
   cp -r actualizacion/frontend/dist/* frontend/dist/ || true
 fi
 
-echo -e "${GREEN}[4/4] Reiniciando servicios PM2 y Node...${NC}"
+echo -e "${GREEN}[4/4] Reiniciando servicios PM2 y Node para DEATurnos...${NC}"
 if command -v pm2 &> /dev/null; then
-  pm2 restart all || true
-  sudo -u dala pm2 restart all || true
-  pm2 restart deaturnos || true
+  PORT=5050 pm2 restart deaturnos --update-env 2>/dev/null || PORT=5050 pm2 start ecosystem.config.js || true
+  pm2 save || true
 fi
 
 echo -e "${GREEN}======================================================${NC}"

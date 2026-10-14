@@ -44,6 +44,12 @@ async function resetCleanDatabase() {
   await seedDatabase();
   await resetAdmin();
 
+  try {
+    fs.chmodSync(dataDir, 0o777);
+    if (fs.existsSync(dbPath)) fs.chmodSync(dbPath, 0o666);
+    if (fs.existsSync(backupDir)) fs.chmodSync(backupDir, 0o777);
+  } catch (e) {}
+
   console.log('========================================================');
   console.log(' ✅ ¡SISTEMA RESTABLECIDO Y EN CEROS EXITOSAMENTE!');
   console.log('========================================================');

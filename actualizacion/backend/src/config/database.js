@@ -31,6 +31,7 @@ function persistToDisk() {
       const data = rawDb.export();
       const buffer = Buffer.from(data);
       fs.writeFileSync(path.resolve(dbPath), buffer);
+      try { fs.chmodSync(path.resolve(dbPath), 0o666); } catch (e) {}
     } catch (e) {
       console.error('Error guardando base de datos SQLite a disco:', e);
     }
