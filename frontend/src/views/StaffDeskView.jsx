@@ -32,8 +32,13 @@ export function StaffDeskView() {
 
   const [counters, setCounters] = useState([]);
   const [services, setServices] = useState([]);
+  const [branches, setBranches] = useState([]);
+  const [selectedBranchId, setSelectedBranchId] = useState(() => {
+    const saved = localStorage.getItem('deaturnos_staff_branch_id');
+    return saved ? Number(saved) : (user?.branch_id || 1);
+  });
   const [selectedCounterId, setSelectedCounterId] = useState(() => {
-    const bId = user?.branch_id || 1;
+    const bId = localStorage.getItem('deaturnos_staff_branch_id') || user?.branch_id || 1;
     const saved = localStorage.getItem(`deaturnos_staff_counter_id_branch_${bId}`);
     return saved ? Number(saved) : null;
   });
@@ -76,9 +81,32 @@ export function StaffDeskView() {
   const [manualCheckingDoc, setManualCheckingDoc] = useState(false);
   const [createdManualTicket, setCreatedManualTicket] = useState(null);
 
-  const branchId = user?.branch_id || 1;
+  const branchId = selectedBranchId;
+  const currentBranchObj = branches.find(b => b.id === Number(selectedBranchId)) || 
+                           (user?.branch_id === selectedBranchId && user?.branch_name ? { name: user.branch_name } : null);
 
-  // Cargar módulos y servicios disponibles
+  // Cargar lista de sedes activas
+  useEffect(() => {
+    api.getBranches().then(res => {
+      if (res.success && res.branches && res.branches.length > 0) {
+        setBranches(res.branches);
+        const exists = res.branches.find(b => b.id === Number(selectedBranchId));
+        if (!exists) {
+          const firstId = res.branches[0].id;
+          setSelectedBranchId(firstId);
+          localStorage.setItem('deaturnos_staff_branch_id', String(firstId));
+        }
+      }
+    }).catch(console.error);
+  }, []);
+
+  const handleBranchChange = (newBranchId) => {
+    setSelectedBranchId(newBranchId);
+    localStorage.setItem('deaturnos_staff_branch_id', String(newBranchId));
+    setSelectedCounterId(null);
+  };
+
+  // Cargar módulos y servicios disponibles para la sede seleccionada
   useEffect(() => {
     if (!branchId) return;
     api.getCounters(branchId).then(res => {
@@ -91,6 +119,8 @@ export function StaffDeskView() {
           setSelectedCounterId(exists.id);
         } else if (res.counters.length > 0) {
           setSelectedCounterId(res.counters[0].id);
+        } else {
+          setSelectedCounterId(null);
         }
       }
     });
@@ -112,7 +142,7 @@ export function StaffDeskView() {
 
   // Cargar cola y turno activo del módulo
   const loadQueueAndStatus = async () => {
-    if (!selectedCounterId) return;
+    if (!selectedCounterId || !branchId) return;
     setLoading(true);
     try {
       const res = await api.getWaitingQueue(branchId, selectedCounterId);
@@ -542,54 +572,80 @@ export function StaffDeskView() {
           </div>
           <div>
             <h1 className="text-xl font-bold font-display text-white">PANEL DE ATENCIÓN EN VENTANILLA Y CONSULTORIO</h1>
-            <p className="text-xs text-slate-400 font-medium">
-              Funcionario / Médico: <strong className="text-slate-200">{user?.full_name}</strong> • Sede: <strong className="text-sky-400">{user?.branch_name || 'Central'}</strong>
+            <p className="text-xs text-slate-400 font-medium flex flex-wrap items-center gap-2">
+              <span>Funcionario / Médico: <strong className="text-slate-200">{user?.full_name}</strong></span>
+              <span>•</span>
+              <span className="flex items-center gap-1.5">
+                <Building2 className="w-3.5 h-3.5 text-sky-400" />
+                Sede Activa: <strong className="text-sky-400 font-bold">{currentBranchObj?.name || (user?.branch_name || 'Seleccione Sede')}</strong>
+              </span>
             </p>
           </div>
         </div>
 
-        {/* Quick Action: Expedir Turno Manual & Counter Selector */}
-        <div className="flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            onClick={() => {
-              setCreatedManualTicket(null);
-              setIsManualModalOpen(true);
-            }}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-pink-600 to-rose-500 hover:from-pink-500 hover:to-rose-400 text-white font-bold text-xs shadow-lg shadow-pink-600/25 transition active:scale-95 cursor-pointer"
-          >
-            <Sparkles className="w-4 h-4" />
-            <span>+ EXPEDIR TURNO (ADULTO MAYOR / PRESENCIAL)</span>
-          </button>
+        {/* Quick Action: Expedir Turno Manual & Sede / Counter Selectors */}
+        <div className="flex flex-col sm:items-end gap-2">
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                setCreatedManualTicket(null);
+                setIsManualModalOpen(true);
+              }}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-pink-600 to-rose-500 hover:from-pink-500 hover:to-rose-400 text-white font-bold text-xs shadow-lg shadow-pink-600/25 transition active:scale-95 cursor-pointer"
+            >
+              <Sparkles className="w-4 h-4" />
+              <span>+ EXPEDIR TURNO (ADULTO MAYOR / PRESENCIAL)</span>
+            </button>
 
-          <div className="flex flex-col sm:items-end gap-1">
-            <div className="flex items-center gap-2">
+            {/* Selector de Sede */}
+            <div className="flex items-center gap-2 bg-slate-950 px-3.5 py-2 rounded-2xl border border-slate-700 shadow-inner">
+              <Building2 className="w-4 h-4 text-sky-400 shrink-0" />
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                Sede:
+              </label>
+              <select
+                value={selectedBranchId || ''}
+                onChange={(e) => handleBranchChange(Number(e.target.value))}
+                className="bg-transparent border-0 text-xs font-bold text-sky-400 focus:outline-none cursor-pointer pr-1"
+              >
+                {branches.map(b => (
+                  <option key={b.id} value={b.id} className="bg-slate-900 text-white">
+                    {b.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Selector de Puesto / Módulo */}
+            <div className="flex items-center gap-2 bg-slate-950 px-3.5 py-2 rounded-2xl border border-slate-700 shadow-inner">
               <label className="text-xs font-bold uppercase tracking-wider text-slate-400">
                 Puesto:
               </label>
               <select
-                value={selectedCounterId}
+                value={selectedCounterId || ''}
                 onChange={(e) => setSelectedCounterId(Number(e.target.value))}
-                className="px-3.5 py-2 rounded-2xl bg-slate-950 border border-slate-700 text-xs font-bold text-emerald-400 focus:outline-none focus:border-emerald-500 shadow-inner"
+                className="bg-transparent border-0 text-xs font-bold text-emerald-400 focus:outline-none cursor-pointer pr-1"
               >
                 {counters.map(c => (
-                  <option key={c.id} value={c.id}>
+                  <option key={c.id} value={c.id} className="bg-slate-900 text-white">
                     {c.name} ({c.code})
                   </option>
                 ))}
               </select>
             </div>
-            {assignedServices.length > 0 && (
-              <div className="flex flex-wrap items-center gap-1.5 justify-end">
-                <span className="text-[10px] text-slate-500 font-semibold">Servicios asignados:</span>
-                {assignedServices.map((s, idx) => (
-                  <span key={idx} className="px-2 py-0.5 rounded-md bg-slate-800 border border-slate-700 text-[10px] font-bold text-sky-300">
-                    {s}
-                  </span>
-                ))}
-              </div>
-            )}
           </div>
+
+          {assignedServices.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5 justify-end">
+              <span className="text-[10px] text-slate-500 font-semibold">Servicios asignados:</span>
+              {assignedServices.map((s, idx) => (
+                <span key={idx} className="px-2 py-0.5 rounded-md bg-slate-800 border border-slate-700 text-[10px] font-bold text-sky-300">
+                  {s}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

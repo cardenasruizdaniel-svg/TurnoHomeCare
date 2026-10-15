@@ -10,8 +10,18 @@ async function resetAdmin() {
   await db.prepare("INSERT OR IGNORE INTO roles (id, name, description) VALUES (2, 'SUPERVISOR', 'Supervisor de sede')").run();
   await db.prepare("INSERT OR IGNORE INTO roles (id, name, description) VALUES (3, 'FUNCIONARIO', 'Operador de ventanilla / consultorio')").run();
 
-  // 2. Asegurar sede principal
-  await db.prepare("INSERT OR IGNORE INTO branches (id, company_id, code, name, address, phone) VALUES (1, 1, 'MAIN', 'Sede Principal', 'Calle 10', '123456')").run();
+  // 2. Asegurar sedes oficiales HomeCare del Quindío I.P.S.
+  await db.prepare(`
+    INSERT INTO branches (id, company_id, code, name, address, phone, business_hours, qr_code_slug, is_active)
+    VALUES (1, 1, 'SEDE-ARMENIA', 'Sede Principal (Armenia)', 'Carrera 13 #3N 50, medicentro Alcazar cons 706', '+57 323 479 0311', 'Lunes a Viernes: 7:00 AM - 6:00 PM', 'sede-armenia', 1)
+    ON CONFLICT(id) DO UPDATE SET is_active = 1, name = 'Sede Principal (Armenia)', company_id = 1
+  `).run();
+
+  await db.prepare(`
+    INSERT INTO branches (id, company_id, code, name, address, phone, business_hours, qr_code_slug, is_active)
+    VALUES (2, 1, 'SEDE-CIRCASIA', 'Sede Circasia', 'Calle 6 No 15-19', '+57 323 479 0311', 'Lunes a Viernes: 7:00 AM - 5:00 PM', 'sede-circasia', 1)
+    ON CONFLICT(id) DO UPDATE SET is_active = 1, name = 'Sede Circasia', company_id = 1
+  `).run();
 
   // 3. Resetear usuario 'admin' a la clave admin123
   const hash123 = bcrypt.hashSync('admin123', 10);

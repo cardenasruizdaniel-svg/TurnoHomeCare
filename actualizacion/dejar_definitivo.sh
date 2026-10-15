@@ -31,11 +31,13 @@ chmod 666 backend/data/active_port.txt 2>/dev/null || true
 # 2. Inicializar la base de datos limpia en ceros
 echo -e "${GREEN}[2/6] Restableciendo base de datos en ceros con HomeCare del Quindío...${NC}"
 node ./backend/src/reset_clean_database.js
+node ./backend/src/restore_branches.js
 chmod -R 777 backend/data 2>/dev/null || true
 
 # 3. Asegurar archivos compilados de frontend
 echo -e "${GREEN}[3/6] Verificando interfaz web compilada (dist)...${NC}"
 if [ -d "actualizacion/frontend/dist" ]; then
+  rm -rf frontend/dist
   mkdir -p frontend/dist
   cp -r actualizacion/frontend/dist/* frontend/dist/ 2>/dev/null || true
 fi

@@ -65,6 +65,11 @@ async function restoreBranches() {
   console.log('========================================================');
 }
 
-restoreBranches().catch(err => {
-  console.error('❌ Error restaurando empresa y sedes:', err);
-});
+if (require.main === module) {
+  restoreBranches().catch(err => {
+    console.error('❌ Error restaurando empresa y sedes:', err);
+    process.exit(1);
+  });
+}
+
+module.exports = restoreBranches;

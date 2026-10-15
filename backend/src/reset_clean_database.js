@@ -38,11 +38,15 @@ async function resetCleanDatabase() {
   const initDatabase = require('./database/init');
   const seedDatabase = require('./database/seed');
   const resetAdmin = require('./reset_admin');
+  const restoreBranches = require('./restore_branches');
 
   await db.init();
   await initDatabase();
   await seedDatabase();
   await resetAdmin();
+  if (typeof restoreBranches === 'function') {
+    await restoreBranches();
+  }
 
   try {
     fs.chmodSync(dataDir, 0o777);
