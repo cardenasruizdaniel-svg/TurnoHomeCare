@@ -36,10 +36,13 @@ chmod -R 777 backend/data 2>/dev/null || true
 
 # 3. Asegurar archivos compilados de frontend
 echo -e "${GREEN}[3/6] Verificando interfaz web compilada (dist)...${NC}"
+REAL_USER="${SUDO_USER:-$USER}"
 if [ -d "actualizacion/frontend/dist" ]; then
   rm -rf frontend/dist
   mkdir -p frontend/dist
   cp -r actualizacion/frontend/dist/* frontend/dist/ 2>/dev/null || true
+  chown -R "$REAL_USER:$REAL_USER" frontend/dist backend/data logs 2>/dev/null || true
+  chmod -R 777 frontend/dist backend/data logs 2>/dev/null || true
 fi
 
 # 4. Configurar y persistir PM2 en puerto 5051 (sin conflicto con Tailscale)
