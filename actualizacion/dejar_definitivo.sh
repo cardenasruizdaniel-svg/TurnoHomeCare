@@ -71,11 +71,11 @@ else
   echo -e "${RED}Aviso: PM2 no está instalado globalmente. Ejecute: npm install -g pm2${NC}"
 fi
 
-# 5. Configurar Tailscale Funnel para acceso exterior por puerto 5050 apuntando al backend 5051
-echo -e "${GREEN}[5/6] Conectando túnel de Tailscale (Externo 5050 ➔ Interno 5051)...${NC}"
+# 5. Configurar Tailscale Funnel para acceso exterior por puerto 10000 apuntando al backend 5051
+echo -e "${GREEN}[5/6] Conectando túnel de Tailscale (Externo 10000 ➔ Interno 5051)...${NC}"
 if command -v tailscale &> /dev/null; then
-  sudo tailscale funnel --bg --https=5050 http://127.0.0.1:5051 2>/dev/null || tailscale funnel --bg --https=5050 http://127.0.0.1:5051 2>/dev/null || true
-  echo -e "${YELLOW}   -> Tailscale Funnel activo: https://...:5050 ➔ http://127.0.0.1:5051${NC}"
+  sudo tailscale funnel --bg --https=10000 http://127.0.0.1:5051 2>/dev/null || tailscale funnel --bg --https=10000 http://127.0.0.1:5051 2>/dev/null || true
+  echo -e "${YELLOW}   -> Tailscale Funnel activo: https://dala-imac.tail96cdf1.ts.net:10000 ➔ http://127.0.0.1:5051${NC}"
 fi
 
 # 6. Prueba automática de salud del servidor y login
