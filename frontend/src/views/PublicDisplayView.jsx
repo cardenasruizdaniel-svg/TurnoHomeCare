@@ -583,11 +583,21 @@ export function PublicDisplayView() {
                     className="w-full h-full object-contain mx-auto"
                   />
                 ) : currentBanner?.imageUrl ? (
-                  <img
-                    src={currentBanner.imageUrl}
-                    alt={currentBanner.title || 'Publicidad'}
-                    className="w-full h-full object-contain mx-auto transition-transform duration-500"
-                  />
+                  <>
+                    {/* Fondo ambiental difuminado que llena todo el cuadro con los colores del banner */}
+                    <img
+                      src={currentBanner.imageUrl}
+                      alt=""
+                      aria-hidden="true"
+                      className="absolute inset-0 w-full h-full object-cover blur-2xl opacity-35 scale-110 pointer-events-none"
+                    />
+                    {/* Imagen principal 100% nítida y completa sin recortar ningún texto */}
+                    <img
+                      src={currentBanner.imageUrl}
+                      alt={currentBanner.title || 'Publicidad'}
+                      className="relative z-10 max-w-full max-h-full object-contain mx-auto drop-shadow-2xl transition-transform duration-500"
+                    />
+                  </>
                 ) : (
                   <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-tr from-pink-900/40 via-purple-900/30 to-teal-900/40 p-4 text-center">
                     <Sparkles className="w-10 h-10 text-pink-400 mb-2 animate-pulse" />
