@@ -444,11 +444,11 @@ export function PublicDisplayView() {
       </header>
 
       {/* 2. Cuerpo Principal */}
-      <main className="flex-1 p-8 grid grid-cols-12 gap-8 items-center max-h-[calc(100vh-160px)]">
+      <main className="flex-1 min-h-0 px-6 sm:px-8 py-3 sm:py-4 grid grid-cols-12 gap-6 lg:gap-8 items-stretch overflow-hidden">
         
         {/* ÁREA IZQUIERDA: Turno Activo (7 columnas) */}
-        <div className="col-span-12 lg:col-span-7 h-full flex flex-col justify-center">
-          <div className={`rounded-3xl border p-8 h-full flex flex-col justify-between shadow-2xl transition-all duration-300 relative overflow-hidden ${
+        <div className="col-span-12 lg:col-span-7 h-full min-h-0 flex flex-col justify-center">
+          <div className={`rounded-3xl border p-6 sm:p-8 h-full flex flex-col justify-between shadow-2xl transition-all duration-300 relative overflow-hidden ${
             d ? 'bg-slate-900/90 border-slate-800' : 'bg-white border-slate-200'
           } ${callingAnimation ? 'ring-4 ring-sky-500/60 shadow-sky-500/20' : ''}`}>
             
@@ -469,7 +469,7 @@ export function PublicDisplayView() {
             </div>
 
             {/* Número de Turno Gigante */}
-            <div className="text-center my-auto py-3">
+            <div className="text-center my-auto py-2">
               {currentTicket ? (
                 <div className="space-y-3">
                   <div className={`font-display font-black tracking-tighter transition-all duration-500 ${
@@ -517,20 +517,20 @@ export function PublicDisplayView() {
                   </div>
                 </div>
               ) : (
-                <div className="py-12 space-y-4">
-                  <div className={`w-20 h-20 mx-auto rounded-full flex items-center justify-center ${
+                <div className="py-8 space-y-3">
+                  <div className={`w-16 h-16 sm:w-20 sm:h-20 mx-auto rounded-full flex items-center justify-center ${
                     d ? 'bg-slate-800 text-slate-500' : 'bg-slate-100 text-slate-400'
                   }`}>
-                    <Clock className="w-10 h-10" />
+                    <Clock className="w-8 h-8 sm:w-10 sm:h-10" />
                   </div>
-                  <p className={`text-3xl font-bold font-display ${d ? 'text-slate-400' : 'text-slate-600'}`}>En espera del próximo llamado</p>
-                  <p className={`text-sm ${d ? 'text-slate-500' : 'text-slate-400'}`}>Los turnos se mostrarán automáticamente al ser llamados.</p>
+                  <p className={`text-2xl sm:text-3xl font-bold font-display ${d ? 'text-slate-400' : 'text-slate-600'}`}>En espera del próximo llamado</p>
+                  <p className={`text-xs sm:text-sm ${d ? 'text-slate-500' : 'text-slate-400'}`}>Los turnos se mostrarán automáticamente al ser llamados.</p>
                 </div>
               )}
             </div>
 
             {/* Footer de la tarjeta izquierda */}
-            <div className={`text-xs flex items-center justify-between pt-4 border-t ${
+            <div className={`text-xs flex items-center justify-between pt-3 border-t ${
               d ? 'border-slate-800/80 text-slate-500' : 'border-slate-200 text-slate-400'
             }`}>
               <span>Actualización en tiempo real vía WebSockets</span>
@@ -543,15 +543,15 @@ export function PublicDisplayView() {
           </div>
         </div>
 
-        {/* ÁREA DERECHA: Banner Multimedia Rotativo (Mayor Tamaño) & Código QR (Más Compacto) */}
-        <div className="col-span-12 lg:col-span-5 h-full flex flex-col gap-3 justify-between">
+        {/* ÁREA DERECHA: Publicidad 70% & Código QR 30% */}
+        <div className="col-span-12 lg:col-span-5 h-full min-h-0 flex flex-col gap-3 justify-between overflow-hidden">
           
-          {/* 1. Carrusel Publicitario (MÁS GRANDE: flex-[2.5]) */}
-          <div className={`rounded-3xl border-2 p-4 sm:p-5 shadow-2xl flex-[2.5] flex flex-col justify-between relative overflow-hidden ${
+          {/* 1. Carrusel Publicitario (70% del espacio vertical) */}
+          <div className={`rounded-3xl border-2 p-3 sm:p-4 shadow-2xl flex-[7] min-h-0 flex flex-col justify-between relative overflow-hidden ${
             d ? 'bg-slate-900/95 border-pink-500/30' : 'bg-white border-pink-200'
           }`}>
             
-            <div className="flex items-center justify-between pb-2 shrink-0">
+            <div className="flex items-center justify-between pb-1.5 shrink-0">
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-pink-500 animate-pulse" />
                 <span className="text-[11px] font-black uppercase tracking-widest text-pink-500">
@@ -567,10 +567,10 @@ export function PublicDisplayView() {
               )}
             </div>
 
-            {/* Contenedor Multimedia Destacado (Imagen o Video Gigante a 100% del espacio) */}
-            <div className="flex-1 my-1 flex flex-col justify-center overflow-hidden">
-              <div className={`w-full flex-1 min-h-[220px] rounded-2xl overflow-hidden relative border shadow-xl flex items-center justify-center ${
-                d ? 'bg-slate-950 border-slate-800' : 'bg-slate-100 border-slate-200'
+            {/* Contenedor Multimedia Destacado (Imagen o Video al 100% visible, sin recortar con object-contain) */}
+            <div className="flex-1 min-h-0 my-1 flex flex-col justify-center overflow-hidden">
+              <div className={`w-full h-full rounded-2xl overflow-hidden relative border shadow-xl flex items-center justify-center p-1 ${
+                d ? 'bg-slate-950/80 border-slate-800' : 'bg-slate-100 border-slate-200'
               }`}>
                 {hasVideo ? (
                   <video
@@ -580,13 +580,13 @@ export function PublicDisplayView() {
                     muted
                     playsInline
                     controls={false}
-                    className="w-full h-full object-cover transition-transform duration-700"
+                    className="w-full h-full object-contain mx-auto"
                   />
                 ) : currentBanner?.imageUrl ? (
                   <img
                     src={currentBanner.imageUrl}
-                    alt={currentBanner.title}
-                    className="w-full h-full object-cover transition-transform duration-700 hover:scale-105"
+                    alt={currentBanner.title || 'Publicidad'}
+                    className="w-full h-full object-contain mx-auto transition-transform duration-500"
                   />
                 ) : (
                   <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-tr from-pink-900/40 via-purple-900/30 to-teal-900/40 p-4 text-center">
@@ -594,26 +594,10 @@ export function PublicDisplayView() {
                     <span className="font-bold text-white text-sm">HomeCare IPS</span>
                   </div>
                 )}
-
-                {/* Título y Subtítulo Superpuestos con Gradiente sobre la Imagen */}
-                {(currentBanner?.title || currentBanner?.subtitle) && (
-                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/90 via-slate-950/50 to-transparent p-3 pt-6 text-white pointer-events-none">
-                    {currentBanner?.title && (
-                      <h3 className="text-base sm:text-lg font-black font-display drop-shadow-md leading-tight truncate">
-                        {currentBanner.title}
-                      </h3>
-                    )}
-                    {currentBanner?.subtitle && (
-                      <p className="text-xs text-slate-200 line-clamp-1 drop-shadow mt-0.5">
-                        {currentBanner.subtitle}
-                      </p>
-                    )}
-                  </div>
-                )}
               </div>
             </div>
 
-            <div className={`flex items-center justify-between pt-2 border-t shrink-0 ${d ? 'border-slate-800/80 text-slate-400' : 'border-slate-200 text-slate-500'}`}>
+            <div className={`flex items-center justify-between pt-1.5 border-t shrink-0 ${d ? 'border-slate-800/80 text-slate-400' : 'border-slate-200 text-slate-500'}`}>
               <span className="text-[11px] font-semibold">
                 HomeCare del Quindío I.P.S.
               </span>
@@ -633,39 +617,48 @@ export function PublicDisplayView() {
 
           </div>
 
-          {/* 2. Código QR (MÁS PEQUEÑO Y COMPACTO: flex-1) */}
-          <div className={`rounded-3xl border-2 p-3.5 shadow-2xl flex-1 flex flex-col justify-between items-center text-center relative overflow-hidden ${
+          {/* 2. Código QR para Solicitar Turno (30% del espacio vertical) */}
+          <div className={`rounded-3xl border-2 p-3 sm:p-4 shadow-2xl flex-[3] min-h-0 flex items-center justify-between gap-4 relative overflow-hidden ${
             d ? 'bg-slate-900/95 border-purple-500/30' : 'bg-white border-purple-200'
           }`}>
             
-            <div className="space-y-0.5">
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-purple-500/15 text-purple-500 border border-purple-500/30 text-[10px] font-black uppercase tracking-wider">
-                📱 SOLICITUD MÓVIL (4G / 5G / Wi-Fi)
-              </span>
-              <h2 className={`text-sm sm:text-base font-black font-display tracking-tight ${d ? 'text-white' : 'text-slate-900'}`}>OBTÉN TU TURNO AQUÍ</h2>
-            </div>
-
-            <div className={`my-1 p-2 rounded-2xl bg-white shadow-lg border-2 hover:scale-105 transition-transform duration-300 flex items-center justify-center ${
-              d ? 'border-slate-800' : 'border-slate-200'
-            }`}>
-              <QRCodeSVG
-                value={publicRequestUrl}
-                size={110}
-                level="H"
-                includeMargin={false}
-              />
-            </div>
-
-            <div className="w-full">
-              <div className={`flex items-center justify-center gap-1.5 text-[11px] font-bold py-1 px-2.5 rounded-xl border ${
+            <div className="flex-1 flex flex-col justify-center space-y-1 text-left min-w-0">
+              <div className="flex items-center gap-1.5">
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-purple-500/15 text-purple-400 border border-purple-500/30 text-[10px] font-black uppercase tracking-wider">
+                  📱 SOLICITA TU TURNO AQUÍ
+                </span>
+              </div>
+              <h2 className={`text-base sm:text-lg font-black font-display tracking-tight leading-snug ${d ? 'text-white' : 'text-slate-900'}`}>
+                OBTÉN TU TURNO DESDE EL CELULAR
+              </h2>
+              <p className={`text-xs ${d ? 'text-slate-400' : 'text-slate-600'} line-clamp-2`}>
+                Escanea con la cámara de tu celular para solicitar turno y recibir avisos.
+              </p>
+              <div className={`inline-flex items-center gap-2 text-[10px] font-bold py-0.5 px-2.5 rounded-lg border w-fit ${
                 d ? 'text-teal-300 bg-teal-500/10 border-teal-500/20' : 'text-teal-800 bg-teal-50 border-teal-200'
               }`}>
-                <span>1. Escanea QR</span>
+                <span>1. Escanea</span>
                 <span>➔</span>
                 <span>2. Digita Cédula</span>
                 <span>➔</span>
                 <span>3. Tu Turno</span>
               </div>
+            </div>
+
+            <div className="shrink-0 flex flex-col items-center justify-center">
+              <div className={`p-2 rounded-2xl bg-white shadow-xl border-2 flex items-center justify-center transition-transform hover:scale-105 ${
+                d ? 'border-purple-500/40 shadow-purple-500/20' : 'border-purple-200'
+              }`}>
+                <QRCodeSVG
+                  value={publicRequestUrl}
+                  size={95}
+                  level="H"
+                  includeMargin={false}
+                />
+              </div>
+              <span className="text-[9px] font-extrabold uppercase tracking-widest text-purple-400 mt-1">
+                ESCANEAR QR
+              </span>
             </div>
 
           </div>
