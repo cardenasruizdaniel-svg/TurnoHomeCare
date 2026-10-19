@@ -129,7 +129,16 @@ async function startServer() {
   await db.init();
   try {
     await initDatabase();
-    await syncServicesAndCounters();
+    // 🛡️ PROTECCIÓN DE BASE DE DATOS:
+    // NUNCA sobreescribir ni resetear datos en una base de datos existente.
+    // Solo sembrar si la base de datos está completamente vacía (instalación inicial en ceros).
+    const userCount = await db.prepare("SELECT COUNT(*) as total FROM users").get();
+    if (!userCount || userCount.total === 0) {
+      console.log('🌱 Base de datos vacía detectada. Sembrando datos iniciales por primera vez...');
+      await syncServicesAndCounters();
+    } else {
+      console.log('🛡️ Base de datos en producción protegida: Sedes, módulos y usuarios existentes se mantienen intactos.');
+    }
   } catch (e) {
     console.error('Error durante la inicialización del servidor:', e);
   }

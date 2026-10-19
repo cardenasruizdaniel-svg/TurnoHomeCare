@@ -28,10 +28,17 @@ chmod -R 777 backend/data logs 2>/dev/null || true
 echo "5051" > backend/data/active_port.txt
 chmod 666 backend/data/active_port.txt 2>/dev/null || true
 
-# 2. Inicializar la base de datos limpia en ceros
-echo -e "${GREEN}[2/6] Restableciendo base de datos en ceros con HomeCare del Quindío...${NC}"
-node ./backend/src/reset_clean_database.js
-node ./backend/src/restore_branches.js
+# 2. Asegurar esquema de base de datos sin borrar datos
+echo -e "${GREEN}[2/6] Verificando esquema de base de datos (preservando sedes y usuarios)...${NC}"
+node -e "
+const db = require('./backend/src/config/database');
+const initDatabase = require('./backend/src/database/init');
+(async () => {
+  await db.init();
+  await initDatabase();
+  console.log('🛡️ Esquema verificado. Datos de sedes, módulos y usuarios preservados intactos.');
+})();
+" || true
 chmod -R 777 backend/data 2>/dev/null || true
 
 # 3. Asegurar archivos compilados de frontend

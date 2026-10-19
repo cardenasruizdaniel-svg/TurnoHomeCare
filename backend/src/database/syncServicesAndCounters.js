@@ -168,9 +168,9 @@ async function syncServicesAndCounters() {
       console.warn("No se pudieron limpiar módulos descontinuados:", e.message);
     }
 
-    // 4. Insertar o actualizar los 5 consultorios/módulos oficiales requeridos PARA TODAS LAS SEDES REGISTRADAS
+    // 4. Insertar o actualizar los 5 consultorios/módulos oficiales requeridos ÚNICAMENTE PARA SEDES ACTIVAS
     const allBranches = await db.prepare("SELECT id FROM branches WHERE is_active = 1").all();
-    const targetBranchIds = (allBranches && allBranches.length > 0) ? allBranches.map(b => b.id) : [1];
+    const targetBranchIds = (allBranches && allBranches.length > 0) ? allBranches.map(b => b.id) : [];
 
     for (const bId of targetBranchIds) {
       for (const c of officialCounters) {
@@ -190,7 +190,7 @@ async function syncServicesAndCounters() {
     const serviceMap = {};
     (allServices || []).forEach(s => { serviceMap[s.code] = s.id; });
 
-    // Vincular servicios a módulos para cada sede
+    // Vincular servicios a módulos para cada sede activa
     for (const c of (allCounters || [])) {
       if (c.code === "MOD-1" || c.code === "MOD-2") {
         // Ventanillas atienden todos los servicios
@@ -214,16 +214,17 @@ async function syncServicesAndCounters() {
       }
     }
 
-    // 5. Sincronización Automática de Usuarios Oficiales (Admin Ing. Daniel Cárdenas Ruiz + 1 usuario por módulo)
+    // 5. Sincronización de Usuarios Oficiales (Preservando roles personalizados como SUPERVISOR)
     const passwordHash = bcrypt.hashSync('Home2026*', 10);
 
     const existingAdmin = await db.prepare("SELECT id FROM users WHERE username = 'admin'").get();
     if (existingAdmin) {
-      await db.prepare("UPDATE users SET full_name = 'Ing. Daniel Cárdenas Ruiz', role_id = 1, password_hash = ?, is_active = 1 WHERE id = ?")
-        .run(passwordHash, existingAdmin.id);
+      await db.prepare("UPDATE users SET full_name = 'Ing. Daniel Cárdenas Ruiz', is_active = 1 WHERE id = ?")
+        .run(existingAdmin.id);
     } else {
-      await db.prepare("INSERT INTO users (id, branch_id, role_id, username, email, password_hash, full_name, is_active) VALUES (1, 1, 1, 'admin', 'admin@homecare.com', ?, 'Ing. Daniel Cárdenas Ruiz', 1)")
-        .run(passwordHash);
+      const firstBranchId = (allBranches && allBranches[0]) ? allBranches[0].id : 2;
+      await db.prepare("INSERT INTO users (id, branch_id, role_id, username, email, password_hash, full_name, is_active) VALUES (1, ?, 1, 'admin', 'admin@homecare.com', ?, 'Ing. Daniel Cárdenas Ruiz', 1)")
+        .run(firstBranchId, passwordHash);
     }
 
     const moduleUserDefs = [
@@ -235,13 +236,15 @@ async function syncServicesAndCounters() {
     ];
 
     for (const m of moduleUserDefs) {
-      const existing = await db.prepare("SELECT id FROM users WHERE username = ?").get(m.username);
+      const existing = await db.prepare("SELECT id, role_id, branch_id FROM users WHERE username = ?").get(m.username);
       if (existing) {
-        await db.prepare("UPDATE users SET full_name = ?, role_id = 3, password_hash = ?, is_active = 1 WHERE id = ?")
-          .run(m.name, passwordHash, existing.id);
+        // 🔒 PRESERVAR EL ROL Y SEDE QUE EL USUARIO HAYA MODIFICADO EN LA BASE DE DATOS
+        await db.prepare("UPDATE users SET full_name = ?, is_active = 1 WHERE id = ?")
+          .run(m.name, existing.id);
       } else {
-        await db.prepare("INSERT INTO users (id, branch_id, role_id, username, email, password_hash, full_name, is_active) VALUES (?, 1, 3, ?, ?, ?, ?, 1)")
-          .run(m.id, m.username, `${m.username.toLowerCase()}@homecare.com`, passwordHash, m.name);
+        const targetBranchId = (allBranches && allBranches[0]) ? allBranches[0].id : 2;
+        await db.prepare("INSERT INTO users (id, branch_id, role_id, username, email, password_hash, full_name, is_active) VALUES (?, ?, 3, ?, ?, ?, ?, 1)")
+          .run(m.id, targetBranchId, m.username, `${m.username.toLowerCase()}@homecare.com`, passwordHash, m.name);
       }
     }
 

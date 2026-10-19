@@ -85,21 +85,8 @@ async function restoreBranches() {
     console.warn('Aviso configurando banners:', e.message);
   }
 
-  // 3. Reactivar/Crear Sede 1 y Sede 2
-  await db.prepare(`
-    INSERT INTO branches (id, company_id, code, name, address, phone, business_hours, qr_code_slug, is_active)
-    VALUES (1, 1, 'SEDE-ARMENIA', 'Sede Principal (Armenia)', 'Carrera 13 #3N 50, medicentro Alcazar cons 706', '+57 323 479 0311', 'Lunes a Viernes: 7:00 AM - 6:00 PM', 'sede-armenia', 1)
-    ON CONFLICT(id) DO UPDATE SET is_active = 1, name = 'Sede Principal (Armenia)', company_id = 1
-  `).run();
-
-  await db.prepare(`
-    INSERT INTO branches (id, company_id, code, name, address, phone, business_hours, qr_code_slug, is_active)
-    VALUES (2, 1, 'SEDE-CIRCASIA', 'Sede Circasia', 'Calle 6 No 15-19', '+57 323 479 0311', 'Lunes a Viernes: 7:00 AM - 5:00 PM', 'sede-circasia', 1)
-    ON CONFLICT(id) DO UPDATE SET is_active = 1, name = 'Sede Circasia', company_id = 1
-  `).run();
-
-  // 4. Ejecutar sincronización de servicios y módulos
-  await syncServicesAndCounters();
+  // 3. Respetar Sedes Físicas y Códigos QR existentes sin reactivar sedes eliminadas
+  console.log('🛡️ Sedes y módulos del usuario preservados intactos.');
 
   console.log('========================================================');
   console.log(' ✅ EMPRESA, SEDES Y BANNERS PURGADOS EXITOSAMENTE');

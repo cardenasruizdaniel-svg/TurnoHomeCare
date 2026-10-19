@@ -22,18 +22,16 @@ if [ -d ".git" ]; then
   git pull origin main || true
 fi
 
-echo -e "${GREEN}[2/4] Sincronizando esquema y semillas de base de datos...${NC}"
+echo -e "${GREEN}[2/4] Verificando esquema de base de datos (preservando datos existentes)...${NC}"
 node -e "
 const db = require('./backend/src/config/database');
-const syncServicesAndCounters = require('./backend/src/database/syncServicesAndCounters');
+const initDatabase = require('./backend/src/database/init');
 (async () => {
   await db.init();
-  await syncServicesAndCounters();
+  await initDatabase();
+  console.log('🛡️ Esquema verificado. Datos de sedes, módulos y usuarios preservados intactos.');
 })();
 " || true
-
-node ./backend/src/reset_admin.js || true
-node ./backend/src/restore_branches.js || true
 
 echo -e "${GREEN}[3/4] Recompilando frontend para producción...${NC}"
 if [ -d "frontend" ]; then
