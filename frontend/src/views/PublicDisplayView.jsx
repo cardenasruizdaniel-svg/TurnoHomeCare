@@ -252,26 +252,42 @@ export function PublicDisplayView() {
     return [
       {
         id: 'b1',
-        title: 'Clínica de Heridas & Cuidadoras',
-        subtitle: 'Atención especializada en heridas y asistencia personalizada con calidez humana en casa.',
-        tag: 'Atención Domiciliaria',
-        imageUrl: '/banners/banner_heridas_cuidadoras.png',
+        title: 'Terapia Respiratoria en Casa',
+        subtitle: 'Apoyo profesional para una mejor calidad de vida.',
+        tag: 'Terapia Especializada',
+        imageUrl: '/banners/banner_terapia_respiratoria.jpg',
         isActive: true
       },
       {
         id: 'b2',
-        title: 'Pedagogía Infantil & Toma de Muestras',
-        subtitle: 'Educación adaptada a tus hijos y laboratorio clínico en la comodidad de tu hogar.',
-        tag: 'Salud y Educación',
-        imageUrl: '/banners/banner_pedagogia_muestras.png',
+        title: 'Hospitalización en Casa',
+        subtitle: 'Atención profesional para pacientes agudos y crónicos sin salir de casa.',
+        tag: 'Hospitalización Domiciliaria',
+        imageUrl: '/banners/banner_hospitalizacion_casa.jpg',
         isActive: true
       },
       {
         id: 'b3',
-        title: 'Psicología, Nutrición y Dietética',
-        subtitle: 'Terapia emocional, manejo del estrés y planes alimenticios saludables para toda la familia.',
-        tag: 'Bienestar Integral',
-        imageUrl: '/banners/banner_psicologia_nutricion.png',
+        title: 'Pediatría en Casa',
+        subtitle: 'Cuidado experto para el bienestar de tus hijos.',
+        tag: 'Pediatría Especializada',
+        imageUrl: '/banners/banner_pediatria_casa.jpg',
+        isActive: true
+      },
+      {
+        id: 'b4',
+        title: 'Terapias en Casa',
+        subtitle: 'Física, respiratoria, ocupacional y fonoaudiología en tu hogar.',
+        tag: 'Rehabilitación Integral',
+        imageUrl: '/banners/banner_terapias_casa.jpg',
+        isActive: true
+      },
+      {
+        id: 'b5',
+        title: 'Atención Domiciliaria en Casa',
+        subtitle: 'Cuidado profesional donde más lo necesitas.',
+        tag: 'Salud Domiciliaria',
+        imageUrl: '/banners/banner_atencion_domiciliaria.jpg',
         isActive: true
       }
     ];

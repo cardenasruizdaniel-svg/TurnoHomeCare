@@ -26,19 +26,63 @@ async function restoreBranches() {
     `).run();
   }
 
-  // 2. PURGAR SOBREESCRITURAS OBSOLETAS O BANNERS VIEJOS POR SEDE
+  // 2. PURGAR SOBREESCRITURAS OBSOLETAS Y CONFIGURAR BANNERS OFICIALES HOMECARE
   try {
     await db.prepare("DELETE FROM settings WHERE key = 'NOMBRE_INSTITUCION'").run();
     await db.prepare("DELETE FROM settings WHERE key = 'BANNERS_PUBLICIDAD' AND branch_id IS NOT NULL").run();
     
-    // Limpiar de la tabla de configuraciones globales cualquier rastro de la foto vieja del consultorio odontológico/médico
-    const globalBanners = await db.prepare("SELECT id, value FROM settings WHERE key = 'BANNERS_PUBLICIDAD' AND branch_id IS NULL").get();
-    if (globalBanners && globalBanners.value && (globalBanners.value.includes('unsplash') || globalBanners.value.includes('Citas y Consultas'))) {
-      console.log('🧹 Eliminando banners de prueba antiguos de la base de datos...');
-      await db.prepare("DELETE FROM settings WHERE id = ?").run(globalBanners.id);
+    const officialBanners = [
+      {
+        id: 'b1',
+        title: 'Terapia Respiratoria en Casa',
+        subtitle: 'Apoyo profesional para una mejor calidad de vida.',
+        tag: 'Terapia Especializada',
+        imageUrl: '/banners/banner_terapia_respiratoria.jpg',
+        isActive: true
+      },
+      {
+        id: 'b2',
+        title: 'Hospitalización en Casa',
+        subtitle: 'Atención profesional para pacientes agudos y crónicos sin salir de casa.',
+        tag: 'Hospitalización Domiciliaria',
+        imageUrl: '/banners/banner_hospitalizacion_casa.jpg',
+        isActive: true
+      },
+      {
+        id: 'b3',
+        title: 'Pediatría en Casa',
+        subtitle: 'Cuidado experto para el bienestar de tus hijos.',
+        tag: 'Pediatría Especializada',
+        imageUrl: '/banners/banner_pediatria_casa.jpg',
+        isActive: true
+      },
+      {
+        id: 'b4',
+        title: 'Terapias en Casa',
+        subtitle: 'Física, respiratoria, ocupacional y fonoaudiología en tu hogar.',
+        tag: 'Rehabilitación Integral',
+        imageUrl: '/banners/banner_terapias_casa.jpg',
+        isActive: true
+      },
+      {
+        id: 'b5',
+        title: 'Atención Domiciliaria en Casa',
+        subtitle: 'Cuidado profesional donde más lo necesitas.',
+        tag: 'Salud Domiciliaria',
+        imageUrl: '/banners/banner_atencion_domiciliaria.jpg',
+        isActive: true
+      }
+    ];
+
+    const existsBanners = await db.prepare("SELECT id FROM settings WHERE key = 'BANNERS_PUBLICIDAD' AND branch_id IS NULL").get();
+    if (existsBanners) {
+      await db.prepare("UPDATE settings SET value = ? WHERE id = ?").run(JSON.stringify(officialBanners), existsBanners.id);
+    } else {
+      await db.prepare("INSERT INTO settings (branch_id, key, value, description, data_type) VALUES (NULL, 'BANNERS_PUBLICIDAD', ?, 'Banners oficiales de publicidad y salud', 'json')").run(JSON.stringify(officialBanners));
     }
+    console.log('✅ 5 Banners Oficiales de HomeCare configurados exitosamente.');
   } catch (e) {
-    console.warn('Aviso limpiando configuraciones:', e.message);
+    console.warn('Aviso configurando banners:', e.message);
   }
 
   // 3. Reactivar/Crear Sede 1 y Sede 2
