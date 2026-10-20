@@ -50,7 +50,7 @@ class TicketController {
    */
   static async requestTicket(req, res) {
     try {
-      const { branchId = 1, serviceId, patientData, appointmentTime = null, targetCounterId = null } = req.body;
+      const { branchId, serviceId, patientData, appointmentTime = null, targetCounterId = null } = req.body;
 
       if (!serviceId || !patientData || !patientData.documentNumber) {
         return res.status(400).json({
@@ -61,8 +61,9 @@ class TicketController {
       }
 
       const ipAddress = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+      const targetBranchId = await TicketService.resolveActiveBranchId(branchId);
       const result = await TicketService.createTicket({
-        branchId: Number(branchId),
+        branchId: targetBranchId,
         serviceId: Number(serviceId),
         patientData,
         ipAddress,
@@ -72,7 +73,7 @@ class TicketController {
 
       // Si fue creado exitosamente (no duplicado), emitir evento de tiempo real
       if (!result.is_duplicate) {
-        socketHandler.emitTicketCreated(branchId, {
+        socketHandler.emitTicketCreated(targetBranchId, {
           ticket: result.ticket,
           queue_position: result.queue_position
         });
@@ -362,7 +363,7 @@ class TicketController {
   static async createSchedule(req, res) {
     try {
       const {
-        branchId = 1,
+        branchId,
         scheduledDate,
         appointmentTime,
         serviceId,
@@ -382,8 +383,10 @@ class TicketController {
       }
 
       const createdByUserId = req.user ? req.user.id : null;
+      const targetBranchId = await TicketService.resolveActiveBranchId(branchId || (req.user ? req.user.branch_id : null));
+
       const result = await TicketService.createScheduledTicket({
-        branchId: Number(branchId),
+        branchId: targetBranchId,
         scheduledDate,
         appointmentTime,
         serviceId: Number(serviceId),
@@ -396,7 +399,7 @@ class TicketController {
       });
 
       if (!result.is_duplicate) {
-        socketHandler.emitTicketCreated(branchId, { ticket: result.ticket });
+        socketHandler.emitTicketCreated(targetBranchId, { ticket: result.ticket });
       }
 
       res.status(result.is_duplicate ? 200 : 201).json({

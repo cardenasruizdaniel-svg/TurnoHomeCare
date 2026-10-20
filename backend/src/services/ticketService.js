@@ -44,8 +44,9 @@ class TicketService {
   /**
    * Crea un nuevo turno validando duplicados, horarios y reglas de prioridad
    */
-  static async createTicket({ branchId = 1, serviceId, patientData, ipAddress = null, appointmentTime = null, targetCounterId = null }) {
-    const branch = await db.prepare('SELECT * FROM branches WHERE id = ? AND is_active = 1').get(branchId);
+  static async createTicket({ branchId = null, serviceId, patientData, ipAddress = null, appointmentTime = null, targetCounterId = null }) {
+    const resolvedBranchId = await this.resolveActiveBranchId(branchId);
+    const branch = await db.prepare('SELECT * FROM branches WHERE id = ? AND is_active = 1').get(resolvedBranchId);
     if (!branch) {
       throw new Error('SEDE_NO_ENCONTRADA_O_INACTIVA');
     }
@@ -58,7 +59,7 @@ class TicketService {
     // 1. Obtener o crear paciente
     const patient = await this.getOrCreatePatient(patientData);
     // 2. Control anti-duplicados por servicio si está habilitado
-    const preventDuplicates = await SettingsService.get('PREVENIR_DUPLICADOS', branchId);
+    const preventDuplicates = await SettingsService.get('PREVENIR_DUPLICADOS', branch.id);
     if (preventDuplicates) {
       const activeTicket = await db.prepare(`
         SELECT t.*, s.name as service_name, b.name as branch_name
@@ -70,7 +71,7 @@ class TicketService {
           AND t.service_id = ?
           AND t.status IN ('ESPERANDO', 'LLAMADO', 'EN_ATENCION')
         ORDER BY t.id DESC LIMIT 1
-      `).get(patient.id, branchId, service.id);
+      `).get(patient.id, branch.id, service.id);
 
       if (activeTicket) {
         return {
@@ -82,13 +83,13 @@ class TicketService {
     }
 
     // 3. Determinar tipo de turno y prefijo
-    const priorityMinAge = await SettingsService.get('EDAD_PRIORIDAD', branchId) || 60;
+    const priorityMinAge = await SettingsService.get('EDAD_PRIORIDAD', branch.id) || 60;
     const isPriority = patient.age >= priorityMinAge || patient.is_priority_auto === 1;
     const ticketType = isPriority ? 'PRIORITARIO' : 'NORMAL';
 
-    const defaultNormalPrefix = await SettingsService.get('PREFIJO_NORMAL', branchId) || 'A';
-    const defaultPriorityPrefix = await SettingsService.get('PREFIJO_PRIORITARIO', branchId) || 'P';
-    const numDigits = await SettingsService.get('DIGITOS_NUMERACION', branchId) || 3;
+    const defaultNormalPrefix = await SettingsService.get('PREFIJO_NORMAL', branch.id) || 'A';
+    const defaultPriorityPrefix = await SettingsService.get('PREFIJO_PRIORITARIO', branch.id) || 'P';
+    const numDigits = await SettingsService.get('DIGITOS_NUMERACION', branch.id) || 3;
 
     // Usar prefijo del servicio si tiene letra asignada, o prefijo prioritario
     const prefix = isPriority 
@@ -112,7 +113,7 @@ class TicketService {
         WHERE branch_id = ? 
           AND (created_date = ? OR DATE(created_at) = ?)
           AND service_id = ?
-      `).get(branchId, today, today, service.id);
+      `).get(branch.id, today, today, service.id);
 
       const nextSequence = (lastSequence && lastSequence.max_seq ? Number(lastSequence.max_seq) : 0) + 1;
       const formattedSeq = String(nextSequence).padStart(numDigits, '0');
@@ -127,7 +128,7 @@ class TicketService {
 
       const result = await insertStmt.run(
         ticketNumber,
-        branchId,
+        branch.id,
         service.id,
         patient.id,
         targetCounterId ? Number(targetCounterId) : null,
@@ -1002,7 +1003,7 @@ class TicketService {
    * Crea una programación de turno para fecha hoy o futura
    */
   static async createScheduledTicket({
-    branchId = 1,
+    branchId = null,
     scheduledDate,
     appointmentTime = null,
     serviceId,
@@ -1018,7 +1019,8 @@ class TicketService {
     const _now = new Date(); const today = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, '0')}-${String(_now.getDate()).padStart(2, '0')}`;
     const targetDate = scheduledDate || today;
 
-    const branch = await db.prepare('SELECT * FROM branches WHERE id = ? AND is_active = 1').get(branchId);
+    const resolvedBranchId = await this.resolveActiveBranchId(branchId);
+    const branch = await db.prepare('SELECT * FROM branches WHERE id = ? AND is_active = 1').get(resolvedBranchId);
     if (!branch) throw new Error('SEDE_NO_ENCONTRADA_O_INACTIVA');
 
     const service = await db.prepare('SELECT * FROM services WHERE id = ? AND is_active = 1').get(serviceId);
@@ -1038,7 +1040,7 @@ class TicketService {
         AND (t.scheduled_date = ? OR t.created_date = ?)
         AND t.status IN ('PROGRAMADO', 'CONFIRMADO', 'ESPERANDO', 'LLAMADO', 'EN_ATENCION')
       LIMIT 1
-    `).get(patient.id, branchId, service.id, targetDate, targetDate);
+    `).get(patient.id, branch.id, service.id, targetDate, targetDate);
 
     if (existingActive) {
       return {
@@ -1049,14 +1051,14 @@ class TicketService {
     }
 
     // 3. Determinar tipo de turno y prefijo
-    const priorityMinAge = await SettingsService.get('EDAD_PRIORIDAD', branchId) || 60;
+    const priorityMinAge = await SettingsService.get('EDAD_PRIORIDAD', branch.id) || 60;
     const isPriorityAuto = patient.age >= priorityMinAge || patient.is_priority_auto === 1;
     const finalTicketType = ticketType || (isPriorityAuto ? 'PRIORITARIO' : 'NORMAL');
     const isPriority = finalTicketType === 'PRIORITARIO' || finalTicketType === 'ESPECIAL';
 
-    const defaultNormalPrefix = await SettingsService.get('PREFIJO_NORMAL', branchId) || 'A';
-    const defaultPriorityPrefix = await SettingsService.get('PREFIJO_PRIORITARIO', branchId) || 'P';
-    const numDigits = await SettingsService.get('DIGITOS_NUMERACION', branchId) || 3;
+    const defaultNormalPrefix = await SettingsService.get('PREFIJO_NORMAL', branch.id) || 'A';
+    const defaultPriorityPrefix = await SettingsService.get('PREFIJO_PRIORITARIO', branch.id) || 'P';
+    const numDigits = await SettingsService.get('DIGITOS_NUMERACION', branch.id) || 3;
 
     const prefix = isPriority
       ? (service.priority_prefix || defaultPriorityPrefix)
@@ -1074,7 +1076,7 @@ class TicketService {
         WHERE branch_id = ? 
           AND service_id = ?
           AND (scheduled_date = ? OR created_date = ?)
-      `).get(branchId, service.id, targetDate, targetDate);
+      `).get(branch.id, service.id, targetDate, targetDate);
 
       const nextSequence = (lastSeq && lastSeq.max_seq ? Number(lastSeq.max_seq) : 0) + 1;
       const formattedSeq = String(nextSequence).padStart(numDigits, '0');
@@ -1087,7 +1089,7 @@ class TicketService {
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         ticketNumber,
-        branchId,
+        branch.id,
         service.id,
         patient.id,
         counterId ? Number(counterId) : null,

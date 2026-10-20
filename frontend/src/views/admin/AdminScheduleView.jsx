@@ -89,6 +89,7 @@ export function AdminScheduleView() {
 
   // Formulario Crear / Editar
   const [formData, setFormData] = useState({
+    branchId: '',
     documentNumber: '',
     fullName: '',
     age: '',
@@ -142,7 +143,10 @@ export function AdminScheduleView() {
       if (srvRes.success) setServices(srvRes.services || []);
       if (cntRes.success) setCounters(cntRes.counters || []);
       if (usrRes.success) setStaffUsers((usrRes.users || []).filter(u => u.role_name === 'FUNCIONARIO' || u.role_name === 'SUPERVISOR'));
-      if (brRes.success && brRes.branches) setBranches(brRes.branches || []);
+      if (brRes.success && brRes.branches) {
+        const activeBranches = (brRes.branches || []).filter(b => b.is_active !== 0);
+        setBranches(activeBranches);
+      }
     }).catch(console.error);
   }, []);
 
@@ -151,8 +155,14 @@ export function AdminScheduleView() {
   }, [selectedDate, branchFilter, serviceFilter, counterFilter, staffFilter, statusFilter, searchQuery]);
 
   const showFeedback = (type, text) => {
-    setFeedbackMsg({ type, text });
-    setTimeout(() => setFeedbackMsg({ type: '', text: '' }), 5000);
+    let friendlyText = text;
+    if (text === 'SEDE_NO_ENCONTRADA_O_INACTIVA') {
+      friendlyText = 'La sede seleccionada no está activa o no fue encontrada. Por favor verifique la sede en la configuración.';
+    } else if (text === 'SERVICIO_NO_ENCONTRADO_O_INACTIVO') {
+      friendlyText = 'El servicio médico seleccionado no está activo o no fue encontrado.';
+    }
+    setFeedbackMsg({ type, text: friendlyText });
+    setTimeout(() => setFeedbackMsg({ type: '', text: '' }), 6000);
   };
 
   // Cambio rápido de fecha
@@ -183,7 +193,12 @@ export function AdminScheduleView() {
 
   // Abrir modal de creación
   const openCreateModal = () => {
+    const defaultBranchId = (branchFilter && branchFilter !== 'all')
+      ? String(branchFilter)
+      : (branches.length > 0 ? String(branches[0].id) : '');
+
     setFormData({
+      branchId: defaultBranchId,
       documentNumber: '',
       fullName: '',
       age: '',
@@ -208,6 +223,7 @@ export function AdminScheduleView() {
 
     setSelectedTicket(ticket);
     setFormData({
+      branchId: String(ticket.branch_id || (branches.length > 0 ? branches[0].id : '')),
       documentNumber: ticket.document_number || '',
       fullName: ticket.patient_name || '',
       age: ticket.patient_age || '',
@@ -244,7 +260,9 @@ export function AdminScheduleView() {
 
     try {
       setActionLoading(true);
+      const targetBranchId = formData.branchId || (branches.length > 0 ? branches[0].id : null);
       const res = await api.createSchedule({
+        branchId: targetBranchId ? Number(targetBranchId) : undefined,
         scheduledDate: formData.scheduledDate,
         appointmentTime: formData.appointmentTime,
         serviceId: Number(formData.serviceId),
@@ -972,6 +990,28 @@ export function AdminScheduleView() {
           title="Programar Turno Anticipado"
         >
           <form onSubmit={handleCreateSubmit} className="space-y-4">
+            {/* Sede de Atención */}
+            {branches && branches.length > 1 ? (
+              <div>
+                <label className="block text-xs font-bold text-slate-400 mb-1">Sede de Atención *</label>
+                <select
+                  required
+                  value={formData.branchId}
+                  onChange={(e) => setFormData({ ...formData, branchId: e.target.value })}
+                  className={`w-full px-3 py-2 rounded-xl text-xs font-bold border ${inputBg}`}
+                >
+                  {branches.map(b => (
+                    <option key={b.id} value={b.id}>{b.name}</option>
+                  ))}
+                </select>
+              </div>
+            ) : branches && branches.length === 1 ? (
+              <div className="flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-slate-800/70 border border-teal-500/30 text-xs">
+                <span className="font-bold text-slate-400">Sede de Atención:</span>
+                <span className="font-bold text-teal-300">📍 {branches[0].name}</span>
+              </div>
+            ) : null}
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* Fecha */}
               <div>
